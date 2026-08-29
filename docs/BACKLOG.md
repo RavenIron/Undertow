@@ -397,6 +397,21 @@ removed: it is the only way to re-answer the question after a Valheim update mov
 put it. The component's presence is strong evidence, not proof — spawn one and watch it before
 trusting the spawner.
 
+✅ **FULLY VERIFIED 2026-08-28 (0.5.1) — including the step no log could settle: IT FLOATS.**
+Driftwood spawns in slack water and was seen bobbing on the surface by the owner. `Root`,
+`RoundLog`, `Wood`, `FirCone`, `FineWood` all spawned cleanly, no missing prefabs, no warnings.
+
+**A REAL BUG WAS FOUND BY THE LIVE TEST, and the log looked healthy the whole time it was there.**
+Eight spawns in a row each printed `[1/12 alive]` — the tracking list emptied every tick, because
+the first version held `GameObject` references and **a dedicated server unloads the instance the
+moment a nearby client takes the item over**, while the item lives on as a ZDO. That silently
+disabled BOTH the cap and the TTL: the entire safety valve against filling the ZDO table was
+inert, and nothing in the output said so. Fixed by tracking `ZDO.m_uid` and looking it up through
+`ZDOMan.GetZDO`, taking ownership before destroying since only the owner may remove a ZDO. The
+count then climbed `1→2→3→4→5` as it should.
+
+This is the clearest case in the project of a green-looking log hiding a dead safety mechanism —
+the sort of thing only a live test finds, which is why task 4 was gated on one.
 ## 4z. Original task 4 specification
 
 🚫 **Blocked until the `Floating` question is answered in-game.** Do not write the spawner
@@ -460,6 +475,20 @@ and the swimmer's measured speed on one line every three seconds. **Then test th
 purpose:** swim directly upstream in the fastest water you can find and confirm you make
 progress. That is the one acceptance criterion that matters.
 
+✅ **VERIFIED LIVE 2026-08-28 (0.5.1), including the safety property.** The decisive lines are
+the ones where the player stopped swimming and simply floated:
+
+```
+swim drift @ (8075,-23) | water 0.345 drift 0.172 (cap 0.7) | swimmer 0.164 m/s, swimSpeed 2
+swim drift @ (8077,-22) | water 0.347 drift 0.173 (cap 0.7) | swimmer 0.165 m/s, swimSpeed 2
+```
+
+**Computed drift 0.172, measured 0.164** — a 95% match, and conclusive proof that the
+1/m_swimAcceleration amplification is cancelled: had the scaling been omitted the swimmer would
+have moved at roughly 3.4 m/s instead of 0.16.
+
+**The drowning guard has a tenfold margin.** While actually swimming the player held 1.9-2.0 m/s
+— full swim speed — against a 0.17 m/s current. Nobody can be pinned offshore.
 ## 5z. Original task 5 specification (its AddPushbackForce advice was WRONG - see above)
 
 Last, deliberately: the highest-annoyance surface in the mod, and it wants the most tuning

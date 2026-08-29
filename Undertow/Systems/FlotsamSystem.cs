@@ -45,17 +45,23 @@ namespace RavenIron.Undertow.Systems
         /// <summary>
         /// What we spawned, so it can be capped and reclaimed.
         ///
-        /// IN MEMORY ONLY, and that is a deliberate limit rather than an oversight: Undertow owns
-        /// no store by locked decision, and adding one for driftwood would be a poor trade. The
-        /// consequence is honest and small — flotsam alive at a restart is forgotten and never
-        /// reclaimed, so at most `MaxAlive` items per session outlive us. Players pick most of it
-        /// up, which is the point of it existing.
+        /// TRACKED BY ZDOID, NOT BY GameObject, AND THAT IS A BUG FIX. The first version held
+        /// GameObject references and every entry vanished within a tick: eight spawns in a live
+        /// session all logged `[1/12 alive]`, because a dedicated server UNLOADS the instance
+        /// once a nearby client takes it over while the item lives on as a ZDO. Holding the
+        /// instance therefore lost the item immediately, which quietly disabled BOTH the cap and
+        /// the TTL — the whole safety valve — while leaving the log looking healthy. Measured
+        /// 2026-08-28. A ZDOID survives the instance and is what actually identifies the thing.
+        ///
+        /// IN MEMORY ONLY, deliberately: Undertow owns no store by locked decision, and adding
+        /// one for driftwood would be a poor trade. Flotsam alive at a restart is forgotten and
+        /// never reclaimed, so at most `MaxAlive` items per session outlive us.
         /// </summary>
         private readonly List<Tracked> _alive = new List<Tracked>();
 
         private struct Tracked
         {
-            public GameObject Go;
+            public ZDOID Id;
             public float SpawnedAt;
         }
 
@@ -194,7 +200,26 @@ namespace RavenIron.Undertow.Systems
                 GameObject go = UnityEngine.Object.Instantiate(prefab, pos, Quaternion.identity);
                 if (go == null) return;
 
-                _alive.Add(new Tracked { Go = go, SpawnedAt = Time.realtimeSinceStartup });
+                // Record the ZDOID, not the instance — the instance is unloaded out from under us
+                // as soon as a client takes the item over. See the _alive summary.
+                ZNetView nview = go.GetComponent<ZNetView>();
+                ZDO zdo = nview != null ? nview.GetZDO() : null;
+                if (zdo == null)
+                {
+                    // No networked identity means we could never reclaim it, so refuse to leave it
+                    // behind at all rather than losing count of it.
+                    UnityEngine.Object.Destroy(go);
+                    if (!_warnedMissingPrefab)
+                    {
+                        _warnedMissingPrefab = true;
+                        Undertow.Log.LogWarning(
+                            $"[{Name}] '{prefabName}' spawned without a ZNetView/ZDO — cannot be capped " +
+                            "or reclaimed, so it was removed. Drop it from the palette.");
+                    }
+                    return;
+                }
+
+                _alive.Add(new Tracked { Id = zdo.m_uid, SpawnedAt = Time.realtimeSinceStartup });
 
                 if (ModConfig.VerboseLogging.Value)
                     Undertow.Log.LogInfo(
@@ -210,12 +235,20 @@ namespace RavenIron.Undertow.Systems
         }
 
         /// <summary>
-        /// Drop entries whose object is gone (picked up, destroyed, unloaded) and reclaim
-        /// anything past its time. Reclaiming matters more than it looks: without it the cap
-        /// becomes a permanent ceiling of abandoned driftwood rather than a rolling one.
+        /// Drop entries whose item is gone (picked up or destroyed) and reclaim anything past its
+        /// time.
+        ///
+        /// Reclaiming matters more than it looks: without it the cap becomes a permanent ceiling
+        /// of abandoned driftwood rather than a rolling one. And the lookup MUST go through
+        /// ZDOMan rather than through a held instance — a dedicated server unloads the instance
+        /// while the ZDO lives on, so an instance-based check reports everything as gone and the
+        /// cap never binds. That is exactly what happened on 2026-08-28.
         /// </summary>
         private void Prune()
         {
+            ZDOMan man = ZDOMan.instance;
+            if (man == null) return;
+
             float now = Time.realtimeSinceStartup;
             float ttl = ModConfig.FlotsamTtlSeconds.Value;
 
@@ -223,7 +256,12 @@ namespace RavenIron.Undertow.Systems
             {
                 Tracked t = _alive[i];
 
-                if (t.Go == null)
+                ZDO zdo;
+                try { zdo = man.GetZDO(t.Id); }
+                catch { zdo = null; }
+
+                // Gone: somebody picked it up, or the world removed it. Stop counting it.
+                if (zdo == null || !zdo.IsValid())
                 {
                     _alive.RemoveAt(i);
                     continue;
@@ -233,13 +271,15 @@ namespace RavenIron.Undertow.Systems
                 {
                     try
                     {
-                        ZNetView nview = t.Go.GetComponent<ZNetView>();
-                        if (nview != null && nview.IsValid() && nview.IsOwner())
-                            nview.Destroy();
-                        else if (ZNetScene.instance != null)
-                            ZNetScene.instance.Destroy(t.Go);
+                        // Take ownership before destroying: only the owner may remove a ZDO, and
+                        // a client may have taken this one over when it came into range.
+                        if (!zdo.IsOwner()) zdo.SetOwner(ZDOMan.GetSessionID());
+                        man.DestroyZDO(zdo);
                     }
-                    catch { /* it is driftwood; never let reclamation break a tick */ }
+                    catch (Exception ex)
+                    {
+                        Undertow.Log.LogWarning($"[{Name}] could not reclaim flotsam: {ex.Message}");
+                    }
 
                     _alive.RemoveAt(i);
                 }

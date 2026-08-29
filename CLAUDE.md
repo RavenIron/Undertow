@@ -33,11 +33,12 @@ its fix. Verified in-game on a dedicated server and a client (2026-08-28).
   | at centre 0.38 m/s | 800m away 0.266 m/s surge x1`, against RW's own
   `storm started at (8101, 368)`. Same coordinates, two mods, two machines.
 
-- **4 — flotsam.** `123 of 1090` item prefabs carry `Floating`, measured headless — the question
-  that gated the whole task, and unanswerable by decompile. The system is capped, TTL-reclaimed
-  and spawns only near a peer, so an empty ocean stays empty (verified over 45s).
-- **5 — swimmers.** `Character.UpdateSwimming` patched, owner-gated, players only. The drowning
-  guard is swept across the entire legal config range in the harness.
+- **4 — flotsam.** `123 of 1090` item prefabs carry `Floating`, measured headless. Driftwood
+  spawns in slack water and **was seen floating on the surface by the owner** — the last step no
+  log could settle. The cap climbs `1→2→3→4→5` and holds; an empty ocean stays empty.
+- **5 — swimmers.** Measured live: computed drift **0.172**, the swimmer's own measured speed
+  while drifting **0.164** — a 95% match, and no sign of the 20x amplification trap. Swimming
+  held 1.9–2.0 m/s against a 0.17 m/s current, so the drowning guard has a tenfold margin.
 
 **KNOWN LIMIT: RW's season is client-blind.** `SeasonSystem.Current` is set only in `Tick()`,
 which RW gates on the simulation authority, so every client computes the field as spring. Boats
@@ -49,9 +50,9 @@ reasoning is in `Core/DriftForce.cs`; read it before touching the force. Three s
 INSTRUMENT failures cost more round-trips than the bugs did — see `docs/BACKLOG.md` task 2.
 
 Every engine fact in *Known traps* below was read out of the shipping assembly with `ilspycmd`
-on 2026-08-28. The one open question that blocks a whole system — which vanilla prefabs carry
-`Floating` — is marked as unverified everywhere it appears, and must stay that way until
-someone has watched it in-game.
+on 2026-08-28, or measured on a live server. Nothing in this file is inferred from the shape of
+a decompile without reading the body - three separate premises turned out to contradict the
+obvious reading, and one of them was a note this file had previously stated as fact.
 
 ---
 
@@ -283,6 +284,16 @@ Verified by decompile 2026-08-28 unless marked otherwise.
   `m_randomEvent`, set by the scheduler on the server and by `RPC_SetEvent` on every client
   (name, time, position), so it answers on all three roles regardless of where anyone stands.
   `RandomEvent.m_name`, `m_pos` and `m_eventRange` are all public.
+
+- **A dedicated server UNLOADS an object's instance while its ZDO lives on, so never track a
+  spawned thing by `GameObject`.** Flotsam held GameObject references and lost every one within
+  a single tick — eight spawns in a live session each logged `[1/12 alive]`, because a nearby
+  client takes the item over and the server drops the instance. That silently disabled BOTH the
+  spawn cap and the TTL, i.e. the entire safety valve against filling the ZDO table, while the
+  log looked perfectly healthy. Track `ZDO.m_uid` instead and look it up through
+  `ZDOMan.instance.GetZDO(id)`; it survives the instance and is what actually identifies the
+  thing. Measured and fixed 2026-08-28. **Take ownership before destroying** — only the owner may
+  remove a ZDO, and a client may have claimed it: `if (!zdo.IsOwner()) zdo.SetOwner(ZDOMan.GetSessionID())`.
 
 - **Another mod's ticked state is usually dead on clients; vanilla's replicated state is not.**
   Ragnarok's Wrath's `WeatherSystem.StormActive` is assigned only in `Tick()`, and its
