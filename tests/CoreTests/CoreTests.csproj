@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- Matches the SDK/runtime actually installed on this machine (10.0.x).
+         RollForward=LatestMajor means this keeps running if the runtime moves on again —
+         the harness only needs *a* modern runtime, not a specific one. -->
+    <TargetFramework>net10.0</TargetFramework>
+    <RollForward>LatestMajor</RollForward>
+    <OutputType>Exe</OutputType>
+    <Nullable>disable</Nullable>
+    <AssemblyName>CoreTests</AssemblyName>
+    <RootNamespace>Undertow.Tests</RootNamespace>
+    <!-- The mod targets net472 and needs Mono to run. These files' *logic* has no Unity
+         dependency, so compiled against stubs they run on any modern .NET. -->
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Local test code -->
+    <Compile Include="Program.cs" />
+    <Compile Include="Stubs.cs" />
+
+    <!--
+      THE SHIPPING SOURCE, not a copy. A harness that duplicates the logic proves nothing
+      about the logic that ships, and drifts apart from it silently.
+
+      CurrentField joins this list at task 1. Keep the rule that gets it here: anything with
+      serialization, parsing, or drift math is testable off-game and belongs under test.
+    -->
+    <Compile Include="..\..\Undertow\Config\ModConfig.cs" />
+    <Compile Include="..\..\Undertow\Core\CurrentField.cs" />
+    <Compile Include="..\..\Undertow\Core\DriftForce.cs" />
+  </ItemGroup>
+
+</Project>

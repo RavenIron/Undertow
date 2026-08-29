@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Undertow\Undertow.csproj" />
+  <Project Path="tests\CoreTests\CoreTests.csproj" />
+</Solution>
