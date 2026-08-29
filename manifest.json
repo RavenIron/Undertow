@@ -1,0 +1,9 @@
+{
+  "name": "Undertow",
+  "version_number": "0.5.1",
+  "website_url": "https://github.com/RavenIron/Undertow",
+  "description": "The sea gets its own motion. Currents run in a learnable shape - basin drift, coastal set, fast water between islands, slack behind a headland - and carry what floats on them. Tides, storm surge, flotsam. No HUD. One DLL, server and clients.",
+  "dependencies": [
+    "denikson-BepInExPack_Valheim-5.4.2333"
+  ]
+}
