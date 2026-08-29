@@ -40,6 +40,10 @@ its fix. Verified in-game on a dedicated server and a client (2026-08-28).
   while drifting **0.164** — a 95% match, and no sign of the 20x amplification trap. Swimming
   held 1.9–2.0 m/s against a 0.17 m/s current, so the drowning guard has a tenfold margin.
 
+**Everything on the roadmap is verified in-game.** The remaining open item is compatibility
+testing against other boat mods: every measurement so far is a clean baseline taken with none
+installed.
+
 **KNOWN LIMIT: RW's season is client-blind.** `SeasonSystem.Current` is set only in `Tick()`,
 which RW gates on the simulation authority, so every client computes the field as spring. Boats
 do not desync (all clients agree) but the seasonal shift is inert away from a listen host. The
@@ -199,6 +203,21 @@ diagnostic bug report in this genre.
 
 ## Locked decisions — do not revisit without asking
 
+| Decision | Answer |
+|---|---|
+| HUD / map / compass / wind gauge | **None.** Navigation instruments are a different mod; that was the other concept on the table when this one was chosen. |
+| Waves, water surface, shaders | **Never touched.** See rule 4. Vanilla's wave sim is shared, deterministic, and drives visuals. |
+| New prefabs | **None.** `ZNetScene.CreateObjectsSorted` calls `DestroyZDO` on any hash it cannot resolve — silent data loss. Flotsam uses vanilla `ItemDrop`s only. |
+| Unattended boat drift | **Default OFF.** Vanilla already damps an empty hull's horizontal velocity to a tenth per tick; that is a stated intent we honour. Losing a moored longship to a mod is a one-star review. |
+| Rivers and lakes | **Ocean only for v1.** Narrow water plus a sideways force pins players against terrain. |
+| Persistence | **None.** `CurrentField` is a pure function of seed, position, world time and season, so it needs no save file and no sync. Anything that makes the sea *remember* breaks that; RW already owns "the world remembers". |
+| Ragnarok's Wrath | **Read-only, soft, one direction.** Reflected reads when present, fully dormant when absent, never a write back. |
+| Moder's wind control | **No exemption from current.** "Moder gives you the wind, not the sea" — a limit on the power without a nerf to it. |
+| Console prefix | `wake` (e.g. `wake here`) |
+| GUID / namespace | `com.raveniron.undertow` / `RavenIron.Undertow` |
+| Name | **Undertow.** Norse sea names are crowded — check the existing sailing mods before renaming. |
+| Timeline | Open-ended. Done when it's done. |
+
 ---
 
 ## Compatibility constraints
@@ -227,8 +246,15 @@ the hull, so a client without RW computes no surge whatever the server believes.
 environment, never reads a season directly, and never touches a material. Where season matters
 it arrives through RW, which already handles the either/or between those two mods.
 
-Other sailing mods are unassessed. Any mod that patches `Ship`, adds force to a hull, or
-rewrites `GetSailForce` deserves the same five-minute decompile before it is assumed harmless.
+**Other sailing and boat mods** — some of them also patch `Ship.CustomFixedUpdate`, and at least
+one popular one adds force to the hull and caps its speed there. That is not a conflict in
+itself: our postfix runs after any prefix and after vanilla, so the current arrives on top of
+whatever the other mod did, and a speed cap simply absorbs it near the ceiling.
+
+**Assume nothing, and do not write another author's implementation into this repo.** Before
+declaring compatibility with any specific mod, install it and MEASURE — the drift acceptance in
+task 2 run twice, once with the other mod and once without, comparing displacement. If they do
+fight, the answer is a default-off compatibility toggle, never a priority war (house rule 1).
 
 **Boat stat mods** (cargo, speed, durability) should compose without contact: they change the
 hull, Undertow changes the water.

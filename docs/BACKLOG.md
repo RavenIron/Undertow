@@ -42,6 +42,14 @@ Shipped: `tools\fetch-libs.ps1` and `tools\run-tests.ps1` ported verbatim from R
 
 **Two findings that cost a round-trip and are now written into `CLAUDE.md`:**
 
+- **House rule 5 fired on `Terminal.commands`** — public in the publicized assembly, private in
+  the real one. It compiled clean and threw `FieldAccessException` in-game. Worse than the rule
+  implies: Mono resolves field access at JIT time, so the enclosing `try/catch` never ran, and
+  the `ConsoleCommand` registration three lines above it never ran either. The instrument
+  disabled the feature it was measuring. Fixed with cached `AccessTools.Field` reflection, kept
+  in a separate method from the registration.
+- **Other boat mods may patch `Ship.CustomFixedUpdate` too** - see task 2 and `CLAUDE.md`.
+
 `tools\package.ps1` was deliberately not ported: its whole value is refusing to package when
 the three version strings disagree, and that is worth having on a real release, not a skeleton.
 It arrives with the first publishable build.
@@ -200,6 +208,9 @@ Do not cite it.
 closing it would mean raising `DriftStrength`, which also changes how fast a hull is grabbed.
 Left alone deliberately.
 
+**Still open, needs a human:** compatibility testing against other boat mods. Everything
+measured so far is a clean baseline, taken with none installed.
+
 ## 2z. Original task 2 build notes (superseded)
 
 Built, unit-tested (**83/83**, every assertion proven to fail without its fix), and confirmed
@@ -238,6 +249,26 @@ mistaken premise as the code — the failure mode a test suite cannot catch by i
 
 ### Verification protocol for whoever next sails
 
+1. Install `Undertow.dll` on the server **and the client** — physics runs on the client that
+   owns the hull, so a server-only install pushes nothing, ever.
+2. Set `VerboseLogging = true` in `com.raveniron.undertow.cfg` on both.
+3. Standing on land: `wake drift` should report **pushed 0 hulls**. That is the control.
+4. Board a boat and get under way, then `wake drift` again. It should now report a push count,
+   the water speed under you, and the velocity change applied that tick. If it still says 0,
+   the patch is not reaching hulls and nothing below this line is worth doing.
+5. `wake here` gives the current's speed and BEARING under you. **The strongest single signal is
+   directional**: drift with the sail down and confirm you move the way `wake here` said.
+6. Quantitative run: from a fixed spot, fixed heading, half sail, 120 seconds, note the end
+   position. Set `EnableDrift = false`, repeat identically. The displacement difference should
+   be on the order of `water speed × 120s` (≈36m at 0.3 m/s), and along the reported bearing.
+   Expect somewhat less than that: vanilla's quadratic damping opposes the drift, and it
+   opposes sideways motion five times harder than forward.
+7. **Repeat step 6 with any other boat mod disabled.** Some of them patch this same method, and
+   at least one adds force to the hull and caps its speed there. Our postfix runs last, so a
+   push arrives on top of whatever they did and a speed cap simply absorbs it near the ceiling -
+   expected to compose, but measure rather than assume. If the two runs differ by more than a
+   cap explains, the answer is a default-off compatibility toggle, never a priority war.
+
 ### What was deliberately NOT done
 
 Nothing assigns `linearVelocity`; nothing touches a ZDO position; the postfix re-checks
@@ -256,6 +287,13 @@ The mod's entire write surface. One postfix on `Ship.CustomFixedUpdate`.
 - **Never touch the ZDO position.**
 - Unattended boats (`m_players.Count == 0`) get a configurable fraction, **default 0**.
 - Fade the current out past 10400m so it never fights `Ship.ApplyEdgeForce`.
+
+⚠️ **Other boat mods may patch this same method**, and at least one popular one adds force to
+the hull and caps its speed there. Our postfix runs last - after any prefix and after vanilla -
+so the current arrives on top of whatever they did, and a speed cap simply absorbs it near the
+ceiling. Expected to compose. **Run the acceptance below twice, with and without**, and compare;
+if the displacement differs by more than a cap explains, the answer is a default-off
+compatibility toggle, never a priority war.
 
 **Acceptance, and it is quantitative:** sail a fixed heading at half sail for a fixed duration
 from a fixed start, with the mod off, and record where you end up. Repeat with the mod on. The
