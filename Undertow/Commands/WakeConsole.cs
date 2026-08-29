@@ -146,12 +146,16 @@ namespace RavenIron.Undertow.Commands
                     case "drift":
                         Drift(args);
                         return;
+                    case "floats":
+                        args.Context.AddString(FloatScan.Describe(40));
+                        return;
                     default:
                         args.Context.AddString(
                             "wake status — what this machine is, and what is running on it\n" +
                             "wake here — the current under your own keel\n" +
                             "wake field <x> <z> — the current at any point, loaded or not\n" +
-                            "wake drift — whether the current is actually reaching boats");
+                            "wake drift — whether the current is actually reaching boats\n" +
+                            "wake floats — which vanilla prefabs carry Floating (gates flotsam)");
                         return;
                 }
             }

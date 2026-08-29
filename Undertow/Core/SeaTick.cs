@@ -92,6 +92,7 @@ namespace RavenIron.Undertow.Core
 
             MaybeReportField();
             MaybeReportStorm();
+            MaybeReportFloats();
 
             if (!Undertow.IsSimulationAuthority()) return;
             if (_systems.Count == 0) return;
@@ -193,6 +194,25 @@ namespace RavenIron.Undertow.Core
             }
 
             Undertow.Log.LogInfo(sb.ToString());
+        }
+
+        private static bool _floatsReported;
+
+        /// <summary>
+        /// One-shot answer to the question that gates flotsam: which vanilla prefabs float.
+        ///
+        /// Verbose-gated and one-shot. Retries until a prefab list exists, because ObjectDB and
+        /// ZNetScene are populated some way into the load and answering "nothing floats" early
+        /// would be a confident false negative — the exact failure this scan exists to avoid.
+        /// </summary>
+        private static void MaybeReportFloats()
+        {
+            if (_floatsReported) return;
+            if (!ModConfig.VerboseLogging.Value) return;
+
+            if (!FloatScan.TryScan(out FloatScan.Result r)) return;   // not loaded yet; try again
+            _floatsReported = true;
+            Undertow.Log.LogInfo(FloatScan.Describe());
         }
 
         private static bool _stormWasRunning;

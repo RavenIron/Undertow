@@ -49,6 +49,19 @@ namespace RavenIron.Undertow.Config
         public static ConfigEntry<float> UnattendedDriftFactor;
         public static ConfigEntry<float> FieldRefreshSeconds;
 
+        // ---- Flotsam (task 4) ------------------------------------------------------------
+        public static ConfigEntry<float>  FlotsamIntervalSeconds;
+        public static ConfigEntry<float>  FlotsamPerHour;
+        public static ConfigEntry<float>  FlotsamMinDepth;
+        public static ConfigEntry<float>  FlotsamRingMinMeters;
+        public static ConfigEntry<float>  FlotsamRingMaxMeters;
+        public static ConfigEntry<int>    FlotsamMaxAlive;
+        public static ConfigEntry<float>  FlotsamTtlSeconds;
+        public static ConfigEntry<float>  FlotsamRareChance;
+        public static ConfigEntry<string> FlotsamCommon;
+        public static ConfigEntry<string> FlotsamRare;
+        public static ConfigEntry<string> FlotsamWreckage;
+
         public static void Bind(ConfigFile cfg)
         {
             const string core = "1 - Core";
@@ -162,6 +175,78 @@ namespace RavenIron.Undertow.Config
                     "costs nine terrain samples per boat per tick. Lower it only if you can " +
                     "measure a difference.",
                     new AcceptableValueRange<float>(0f, 5f)));
+
+            const string flotsam = "5 - Flotsam";
+
+            FlotsamIntervalSeconds = cfg.Bind(flotsam, "FlotsamIntervalSeconds", 20f,
+                new ConfigDescription(
+                    "Seconds between flotsam passes. One candidate point is tested per player " +
+                    "per pass, so this is the coarse dial for how busy the sea feels.",
+                    new AcceptableValueRange<float>(2f, 600f)));
+
+            FlotsamPerHour = cfg.Bind(flotsam, "FlotsamPerHour", 6f,
+                new ConfigDescription(
+                    "Pieces of flotsam per hour per player, in perfectly slack water - and " +
+                    "scaled down sharply as the water runs faster, so most candidate points " +
+                    "produce nothing. Expressed per HOUR so the number survives a change to " +
+                    "FlotsamIntervalSeconds; a rate that silently means something else when a " +
+                    "neighbouring constant moves is a trap.",
+                    new AcceptableValueRange<float>(0f, 120f)));
+
+            FlotsamMinDepth = cfg.Bind(flotsam, "FlotsamMinDepth", 12f,
+                new ConfigDescription(
+                    "Flotsam needs at least this much water under it. Keeps driftwood off the " +
+                    "shallows where a player would find it by walking rather than by sailing.",
+                    new AcceptableValueRange<float>(0f, 30f)));
+
+            FlotsamRingMinMeters = cfg.Bind(flotsam, "FlotsamRingMinMeters", 30f,
+                new ConfigDescription(
+                    "Nearest flotsam may appear to a player. Far enough that it does not pop into " +
+                    "existence under their nose.",
+                    new AcceptableValueRange<float>(5f, 200f)));
+
+            FlotsamRingMaxMeters = cfg.Bind(flotsam, "FlotsamRingMaxMeters", 90f,
+                new ConfigDescription(
+                    "Furthest flotsam may appear. Keep it inside the loaded zone around a player, " +
+                    "or the object spawns where nothing is watching.",
+                    new AcceptableValueRange<float>(10f, 300f)));
+
+            FlotsamMaxAlive = cfg.Bind(flotsam, "FlotsamMaxAlive", 12,
+                new ConfigDescription(
+                    "Hard ceiling on flotsam this server has spawned and not yet reclaimed. THE " +
+                    "safety valve: the whole risk of this system is a long-running world quietly " +
+                    "filling its ZDO table with driftwood, and this is what forbids it.",
+                    new AcceptableValueRange<int>(0, 100)));
+
+            FlotsamTtlSeconds = cfg.Bind(flotsam, "FlotsamTtlSeconds", 1800f,
+                new ConfigDescription(
+                    "Seconds before unclaimed flotsam is reclaimed. Without this the cap becomes " +
+                    "a permanent ceiling of abandoned driftwood rather than a rolling one. Set 0 " +
+                    "to never reclaim, and accept that the sea fills up to the cap and stays there.",
+                    new AcceptableValueRange<float>(0f, 86400f)));
+
+            FlotsamRareChance = cfg.Bind(flotsam, "FlotsamRareChance", 0.04f,
+                new ConfigDescription(
+                    "Chance a piece of flotsam comes from the rare table instead. Low on purpose: " +
+                    "the point of a prize is that it is not the usual thing.",
+                    new AcceptableValueRange<float>(0f, 1f)));
+
+            FlotsamCommon = cfg.Bind(flotsam, "FlotsamCommon",
+                "Wood,RoundLog,FineWood,ElderBark,FirCone,PineCone,Root",
+                "What usually washes up, comma separated. MUST be prefabs that carry a Floating " +
+                "component or they sink out of reach - run `wake floats` for the list the game " +
+                "actually has (123 of 1090 items, measured). Note that Floating is Valheim's " +
+                "loss-prevention marker rather than buoyancy, so an iron shield floats and ore " +
+                "does not: choose for the story, not for physics.");
+
+            FlotsamRare = cfg.Bind(flotsam, "FlotsamRare",
+                "DragonTear,Wishbone,MeadSwimmer,Demister",
+                "The occasional prize. Same Floating rule applies.");
+
+            FlotsamWreckage = cfg.Bind(flotsam, "FlotsamWreckage",
+                "ShieldWood,SpearWood,Club,BowFineWood,FishingRod,SerpentMeat,FishingBaitOcean",
+                "What washes up instead while a Ragnarok's Wrath storm stands over that water. " +
+                "This is where the sea gets a voice without a line of UI. Ignored without RW.");
         }
     }
 }

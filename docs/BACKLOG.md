@@ -366,7 +366,38 @@ the one users will hit.
 
 ---
 
-## 4. Flotsam
+## 4. Flotsam — UNBLOCKED 2026-08-28 (0.4.1): the `Floating` question is answered
+
+**123 of 1090 item prefabs carry `Floating`.** Measured headless by scanning
+`ObjectDB.instance.m_items` on a live dedicated server — the one question no decompile could
+answer, because component attachment lives in Unity asset data rather than in the assembly.
+Flotsam can be built from vanilla `ItemDrop`s, so the no-new-prefabs constraint holds and the
+design survives.
+
+**The surprise, and it changes how the palette is chosen: `Floating` is loss-prevention, not
+buoyancy.** `ShieldIronTower`, `MaceIron` and `ShieldFlametal` float; ore, stone, berries and
+most food do not. Valheim attached it to things a player might drop and never recover. So what
+washes up is a FLAVOUR decision, not a list dictated by physics — pick for the story, not for
+what happens to be buoyant.
+
+Usable palette, from the measured list:
+
+| Kind | Prefabs |
+|---|---|
+| Driftwood | `Wood` `RoundLog` `FineWood` `ElderBark` `Blackwood` `YggdrasilWood` `Root` |
+| Forest debris | `FirCone` `PineCone` `HardAntler` `WitheredBone` `Tar` |
+| From the sea | `SerpentMeat` `BonemawSerpentTooth` `VoltureMeat` |
+| Wreckage | `ShieldWood` `SpearWood` `Club` `BowFineWood` `FishingRod` `FishingBaitOcean` |
+| Rare prize | `DragonTear` `Wishbone` `Demister` `MeadSwimmer` |
+
+`wake floats` reports this in-game; `VerboseLogging` logs it once at boot. Kept rather than
+removed: it is the only way to re-answer the question after a Valheim update moves the assets.
+
+⚠️ **One step still unproven:** that a spawned `ItemDrop` actually SITS on the surface where we
+put it. The component's presence is strong evidence, not proof — spawn one and watch it before
+trusting the spawner.
+
+## 4z. Original task 4 specification
 
 🚫 **Blocked until the `Floating` question is answered in-game.** Do not write the spawner
 first.

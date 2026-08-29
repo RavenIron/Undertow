@@ -34,6 +34,7 @@ namespace Undertow.Tests
             ModConfigTests();
             CurrentFieldTests();
             DriftForceTests();
+            FlotsamMathTests();
 
             Console.WriteLine($"\n{_passed} passed, {_failed} failed.");
             return _failed == 0 ? 0 : 1;
@@ -413,6 +414,102 @@ namespace Undertow.Tests
 
             DriftForce.Compute(1f, 1f, 0f, coupling, dt, 1f, 0f, out dvx, out dvz);
             Check(dvx == 0f && dvz == 0f, "a zero edge fade pushes nothing");
+        }
+
+        private static void FlotsamMathTests()
+        {
+            Section("FlotsamMath");
+
+            const float maxSpeed = 1.2f;
+            const float minDepth = 12f;
+
+            // ---- where flotsam gathers -----------------------------------------------------
+            // The whole mechanic: slack water collects, fast water does not. If this inverts,
+            // driftwood piles up in the races and the feature says the opposite of what it means.
+            var slackSample = new FieldSample { Speed = 0.02f, Depth = 30f };
+            var fastSample  = new FieldSample { Speed = 1.1f,  Depth = 30f };
+            float slackWeight = FlotsamMath.GatherWeight(slackSample, maxSpeed, minDepth);
+            float fastWeight  = FlotsamMath.GatherWeight(fastSample,  maxSpeed, minDepth);
+            Check(slackWeight > fastWeight, $"slack water gathers more than fast ({Fmt(slackWeight)} vs {Fmt(fastWeight)})");
+            Check(slackWeight > 0.9f, $"dead water gathers near maximum ({Fmt(slackWeight)})");
+
+            // Monotonic across the whole range: no speed gathers more than a slower one.
+            bool monotonic = true;
+            float previous = 2f;
+            for (float sp = 0f; sp <= maxSpeed; sp += 0.05f)
+            {
+                var s2 = new FieldSample { Speed = sp, Depth = 30f };
+                float w = FlotsamMath.GatherWeight(s2, maxSpeed, minDepth);
+                if (w > previous + 1e-6f) monotonic = false;
+                if (w < 0f || w > 1f) monotonic = false;
+                previous = w;
+            }
+            Check(monotonic, "gather weight falls monotonically through 0..1 as water speeds up");
+
+            // ---- depth gate ----------------------------------------------------------------
+            // NON-ZERO SPEED ON PURPOSE. These first used Speed = 0, which meant an unrelated
+            // injury to the slackness term ALSO drove them to zero — they passed while the depth
+            // gate was deleted, one bug masking another. Caught 2026-08-28 by injuring both at
+            // once. At 0.1 m/s the weight is high unless the gate itself is what rejects it, and
+            // the control below proves that.
+            var atMin    = new FieldSample { Speed = 0.1f, Depth = minDepth };
+            var shallow  = new FieldSample { Speed = 0.1f, Depth = 5f };
+            var onLand   = new FieldSample { Speed = 0.1f, Depth = -3f };
+            var deepEnough = new FieldSample { Speed = 0.1f, Depth = minDepth + 1f };
+            Check(FlotsamMath.GatherWeight(deepEnough, maxSpeed, minDepth) > 0.5f,
+                "the probe speed scores highly when deep enough, so a 0 below means the gate fired");
+            Check(FlotsamMath.GatherWeight(atMin, maxSpeed, minDepth) == 0f, "no flotsam at exactly the minimum depth");
+            Check(FlotsamMath.GatherWeight(shallow, maxSpeed, minDepth) == 0f, "no flotsam in the shallows");
+            Check(FlotsamMath.GatherWeight(onLand, maxSpeed, minDepth) == 0f, "no flotsam on land");
+
+            // ---- the rate is per HOUR, not per tick ----------------------------------------
+            // Why that matters: FlotsamIntervalSeconds can be retuned without silently changing
+            // how much washes up. A per-tick rate would couple two unrelated dials.
+            Check(FlotsamMath.ShouldSpawn(1f, 3600f, 1f, 0.5f), "3600/hour over one second is certain");
+            Check(!FlotsamMath.ShouldSpawn(1f, 0f, 60f, 0.0f), "a zero rate never spawns");
+            Check(!FlotsamMath.ShouldSpawn(0f, 3600f, 60f, 0.0f), "zero gather weight never spawns");
+
+            // Doubling the elapsed time doubles the chance - the property that keeps the rate stable.
+            // RATE CHOSEN SO THE COUNTS ARE BIG. At the shipped 6/hour the expected counts are
+            // about 2 per 1000, and a +/-2 tolerance swallowed the entire elapsed-time factor —
+            // this test passed with `deltaSeconds` deleted from the formula. Measured 2026-08-28.
+            // At 45/hour the windows land near 250 and 500, where a missing factor cannot hide.
+            const float perHour = 45f;
+            float shortWindow = 0f, longWindow = 0f;
+            for (int i = 0; i < 1000; i++)
+            {
+                float roll = i / 1000f;
+                if (FlotsamMath.ShouldSpawn(1f, perHour, 20f, roll)) shortWindow++;
+                if (FlotsamMath.ShouldSpawn(1f, perHour, 40f, roll)) longWindow++;
+            }
+            Check(shortWindow > 200f && longWindow > 400f,
+                $"the rate sweep produces counts large enough to mean something ({Fmt(shortWindow)}, {Fmt(longWindow)})");
+            Check(Math.Abs(longWindow - shortWindow * 2f) <= 5f,
+                $"twice the elapsed time gives twice the chance ({Fmt(shortWindow)} vs {Fmt(longWindow)} per 1000)");
+
+            // ---- weighted pick -------------------------------------------------------------
+            float[] table = { 1f, 3f };
+            int zero = 0, one = 0;
+            for (int i = 0; i < 1000; i++)
+            {
+                if (FlotsamMath.PickWeighted(table, i / 1000f) == 0) zero++; else one++;
+            }
+            Check(Math.Abs(zero - 250) < 15 && Math.Abs(one - 750) < 15,
+                $"weights are respected ({zero}/{one} against an expected 250/750)");
+
+            Check(FlotsamMath.PickWeighted(null, 0.5f) == -1, "a null table answers -1, not a crash");
+            Check(FlotsamMath.PickWeighted(new float[0], 0.5f) == -1, "an empty table answers -1");
+            Check(FlotsamMath.PickWeighted(new float[] { 0f, 0f }, 0.5f) == -1, "an all-zero table answers -1");
+            Check(FlotsamMath.PickWeighted(new float[] { 0f, 1f }, 0f) == 1, "a zero-weight entry is never picked");
+
+            // The very top of the range must land in bounds rather than falling off the end.
+            bool inBounds = true;
+            for (float r = 0f; r <= 1.0001f; r += 0.001f)
+            {
+                int idx = FlotsamMath.PickWeighted(table, r);
+                if (idx < 0 || idx >= table.Length) inBounds = false;
+            }
+            Check(inBounds, "every roll from 0 to 1 inclusive picks a valid index");
         }
 
         private static float AngleBetween(FieldSample a, FieldSample b)

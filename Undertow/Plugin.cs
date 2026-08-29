@@ -32,7 +32,7 @@ namespace RavenIron.Undertow
     {
         public const string PluginId      = "com.raveniron.undertow";
         public const string PluginName    = "Undertow";
-        public const string PluginVersion = "0.3.4";
+        public const string PluginVersion = "0.4.2";
 
         public static Undertow Instance { get; private set; }
         public static ManualLogSource Log { get; private set; }
@@ -85,12 +85,13 @@ namespace RavenIron.Undertow
         /// SeaTick's cursor, so ordering is a mild scheduling hint only â€” no system may depend
         /// on another having ticked first within the same frame.
         ///
-        /// EMPTY AT 0.1.0, and legitimately so. Task 0 ships the skeleton; the first registered
-        /// system is Flotsam at task 4. Drift (task 2) and swimmers (task 5) are Harmony patches
-        /// on the owning machine, not SeaTick systems, and will never appear in this list.
+        /// Drift (task 2) and swimmers (task 5) are Harmony patches on the machine that OWNS the
+        /// hull, not SeaTick systems, and will never appear in this list — that split is the
+        /// whole authority story of this mod.
         /// </summary>
         private static void RegisterSystems()
         {
+            SeaTick.Register(new Systems.FlotsamSystem());
         }
 
         /// <summary>
