@@ -31,6 +31,7 @@
     <Compile Include="..\..\Undertow\Core\CurrentField.cs" />
     <Compile Include="..\..\Undertow\Core\DriftForce.cs" />
     <Compile Include="..\..\Undertow\Core\FlotsamMath.cs" />
+    <Compile Include="..\..\Undertow\Core\SwimDrift.cs" />
   </ItemGroup>
 
 </Project>

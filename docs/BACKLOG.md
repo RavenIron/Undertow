@@ -414,7 +414,53 @@ measure it, do not assume it. Removing every player from the area stops producti
 
 ---
 
-## 5. Swimmers
+## 5. Swimmers — BUILT 0.5.0, ARMED, drift itself needs a swimmer
+
+Harness **162/162**, every assertion proven to fail without its fix. The patch attaches on a
+dedicated server:
+
+```
+Harmony patched 3: Terminal.InitTerminal, Character.UpdateSwimming, Ship.CustomFixedUpdate
+```
+
+That is a real result: `UpdateSwimming` is PRIVATE, and `m_currentVel` and `m_nview` are too, so
+attachment proves Harmony resolved the method and both field injections — including the writable
+`ref ___m_currentVel`. A wrong name throws at patch time.
+
+**THE BACKLOG'S OWN PRESCRIPTION WAS WRONG, and reading the body before building caught it.**
+This task said to fold the current in "the way vanilla's own `AddPushbackForce(ref m_currentVel)`
+does". That helper ignores `m_pushForce`'s magnitude completely and drives velocity to a flat
+20 m/s along its direction, halved to 10 while swimming — it ejects a body from a creature it is
+clipping through. A 0.3 m/s current through that channel would fire a swimmer off at five times
+swim speed. Both `CLAUDE.md` and this entry are corrected; the old advice is marked as wrong
+rather than quietly deleted.
+
+**The scaling is the other trap, and it is a factor of twenty.** Vanilla lerps `m_currentVel`
+toward the swimmer's intent each frame, so a per-frame addition `d` settles at
+`d / m_swimAcceleration` — and that is 0.05. The delta is therefore pre-multiplied by the
+acceleration, which cancels the amplification exactly and leaves the steady state equal to the
+intended drift. A test simulates vanilla's own lerp for 4000 frames rather than trusting the
+algebra.
+
+**The drowning guard is a SAFETY PROPERTY, not a balance dial.** `SwimmerMaxShareOfSwimSpeed`
+caps drift as a share of the character's own swim speed. The harness sweeps the ENTIRE legal
+config range — every drift factor, every cap, water from 0 to 5 m/s — and asserts a swimmer
+always out-swims the water. If a player can be held offshore until they drown, the feature is
+wrong rather than mistuned. Worst case across the whole range is 0.9 of swim speed, at the
+extreme of a setting the description warns about; at shipped defaults it is 0.21 m/s against a
+swim speed of 2.
+
+**Players only, deliberately.** Vanilla lerps a CREATURE's swim velocity with a factor of 0.5
+rather than `m_swimAcceleration`, so the scaling above would be wrong for them — and dragging
+swimming creatures around changes AI pathing, which nothing asked for.
+
+🚫 **Unverified, and needs a swimmer:** that the drift is actually felt in the water. Swim out
+into open ocean with `VerboseLogging` on and the log prints water speed, computed drift, the cap
+and the swimmer's measured speed on one line every three seconds. **Then test the guard on
+purpose:** swim directly upstream in the fastest water you can find and confirm you make
+progress. That is the one acceptance criterion that matters.
+
+## 5z. Original task 5 specification (its AddPushbackForce advice was WRONG - see above)
 
 Last, deliberately: the highest-annoyance surface in the mod, and it wants the most tuning
 evidence behind it.

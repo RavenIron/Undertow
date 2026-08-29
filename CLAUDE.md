@@ -17,8 +17,8 @@ Design document (the reasoning behind every decision here):
 
 ## Status
 
-**Tasks 0–3 are done and verified in-game (2026-08-28, dedicated server + client).** Harness
-**97/97**, and every assertion in it has been proven to fail without its fix.
+**THE ROADMAP IS BUILT.** Tasks 0–5, harness **162/162**, every assertion proven to fail without
+its fix. Verified in-game on a dedicated server and a client (2026-08-28).
 
 - **0 — skeleton.** Loads with `dedicated=True`; the `wake` console is registered, confirmed by
   reading `Terminal.commands` back rather than assuming.
@@ -32,6 +32,12 @@ Design document (the reasoning behind every decision here):
   live storm measured on the CLIENT: `STORM at (8101, 368) — IsStormAt(centre)=True, surge x1.6
   | at centre 0.38 m/s | 800m away 0.266 m/s surge x1`, against RW's own
   `storm started at (8101, 368)`. Same coordinates, two mods, two machines.
+
+- **4 — flotsam.** `123 of 1090` item prefabs carry `Floating`, measured headless — the question
+  that gated the whole task, and unanswerable by decompile. The system is capped, TTL-reclaimed
+  and spawns only near a peer, so an empty ocean stays empty (verified over 45s).
+- **5 — swimmers.** `Character.UpdateSwimming` patched, owner-gated, players only. The drowning
+  guard is swept across the entire legal config range in the harness.
 
 **KNOWN LIMIT: RW's season is client-blind.** `SeasonSystem.Current` is set only in `Tick()`,
 which RW gates on the simulation authority, so every client computes the field as spring. Boats
@@ -245,9 +251,23 @@ Verified by decompile 2026-08-28 unless marked otherwise.
   adds forces to it, so `AddForce` works. A swimming `Character` is **servo-controlled**:
   `Character.UpdateSwimming` computes `force = m_currentVel - m_body.linearVelocity`, zeroes
   `force.y`, clamps it to 20, and applies it as `ForceMode.VelocityChange` every frame — so an
-  external `AddForce` on a swimmer is **cancelled on the next tick**. Vanilla shows the
-  sanctioned alternative one line above: `AddPushbackForce(ref m_currentVel)` folds an external
-  push into the *target* velocity. Do that, not a force.
+  external `AddForce` on a swimmer is **cancelled on the next tick**. Write to `m_currentVel`
+  instead — but read the two traps below first, because the obvious way to do it is wrong twice
+  over.
+
+- 🚫 **`Character.AddPushbackForce` is a SHOVE, not a nudge. This entry previously recommended
+  it and that advice was WRONG** — corrected 2026-08-28 by reading the body before shipping it.
+  It looks like vanilla's sanctioned "fold an external push into the velocity target" helper.
+  In fact it ignores `m_pushForce`'s MAGNITUDE entirely and drives velocity to a flat **20 m/s**
+  along its direction — `velocity += normalized * (20f - num)` — halved to 10 while swimming. It
+  exists to eject a body from a creature it is clipping through. A 0.3 m/s current routed
+  through it would launch a swimmer at five times swim speed.
+
+- **Adding to `Character.m_currentVel` is amplified by `1 / m_swimAcceleration`.** Vanilla lerps
+  that target toward the swimmer's intent every frame, so a per-frame addition `d` settles at
+  `d / m_swimAcceleration` — and vanilla's value is **0.05**, a twentyfold amplification. Scale
+  by the acceleration first, or a 1 m/s current drags a swimmer at 20 m/s. `m_swimSpeed` and
+  `m_swimAcceleration` are public; `m_currentVel`, `m_nview` and `UpdateSwimming` are not.
 
 - **Copy vanilla's force convention from the method you are patching.**
   `CustomFixedUpdate` uses `AddForceAtPosition(v * m_body.mass, pos, ForceMode.Impulse)` with

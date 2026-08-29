@@ -62,6 +62,10 @@ namespace RavenIron.Undertow.Config
         public static ConfigEntry<string> FlotsamRare;
         public static ConfigEntry<string> FlotsamWreckage;
 
+        // ---- Swimmers (task 5) -----------------------------------------------------------
+        public static ConfigEntry<float> SwimmerDriftFactor;
+        public static ConfigEntry<float> SwimmerMaxShareOfSwimSpeed;
+
         public static void Bind(ConfigFile cfg)
         {
             const string core = "1 - Core";
@@ -247,6 +251,25 @@ namespace RavenIron.Undertow.Config
                 "ShieldWood,SpearWood,Club,BowFineWood,FishingRod,SerpentMeat,FishingBaitOcean",
                 "What washes up instead while a Ragnarok's Wrath storm stands over that water. " +
                 "This is where the sea gets a voice without a line of UI. Ignored without RW.");
+
+            const string swimmers = "6 - Swimmers";
+
+            SwimmerDriftFactor = cfg.Bind(swimmers, "SwimmerDriftFactor", 0.5f,
+                new ConfigDescription(
+                    "Share of the water's speed that carries a swimming player. Half by default: " +
+                    "a body in the water is not a hull, and being set gently down the coast is " +
+                    "atmosphere. Set 0 to leave swimmers alone entirely.",
+                    new AcceptableValueRange<float>(0f, 1f)));
+
+            SwimmerMaxShareOfSwimSpeed = cfg.Bind(swimmers, "SwimmerMaxShareOfSwimSpeed", 0.35f,
+                new ConfigDescription(
+                    "Hard ceiling on swimmer drift, as a share of that character's own swim speed. " +
+                    "THIS IS A SAFETY PROPERTY, NOT A BALANCE DIAL: if a player can be held " +
+                    "offshore by the current until they drown, the feature is wrong rather than " +
+                    "mistuned. At the default a swimmer always makes headway against the worst " +
+                    "water in the world. Raising it toward 1.0 approaches the point where they " +
+                    "cannot, and above that they simply lose.",
+                    new AcceptableValueRange<float>(0f, 0.9f)));
         }
     }
 }

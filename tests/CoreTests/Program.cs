@@ -35,6 +35,7 @@ namespace Undertow.Tests
             CurrentFieldTests();
             DriftForceTests();
             FlotsamMathTests();
+            SwimDriftTests();
 
             Console.WriteLine($"\n{_passed} passed, {_failed} failed.");
             return _failed == 0 ? 0 : 1;
@@ -510,6 +511,84 @@ namespace Undertow.Tests
                 if (idx < 0 || idx >= table.Length) inBounds = false;
             }
             Check(inBounds, "every roll from 0 to 1 inclusive picks a valid index");
+        }
+
+        private static void SwimDriftTests()
+        {
+            Section("SwimDrift");
+
+            const float swimSpeed = 2f;          // vanilla Character.m_swimSpeed
+            const float swimAccel = 0.05f;       // vanilla Character.m_swimAcceleration
+            const float cap = 0.35f;
+            const float factor = 0.5f;
+
+            // ---- THE SCALING, which is the whole file --------------------------------------
+            // Vanilla lerps m_currentVel toward the swimmer's intent each frame, so an addition
+            // of d settles at d / m_swimAcceleration. At 0.05 that is a TWENTYFOLD amplification.
+            // The delta must therefore be pre-multiplied by the acceleration, and the steady
+            // state must come back out as the intended drift rather than 20x it.
+            SwimDrift.Compute(1f, 0f, 1f, swimSpeed, 1f, swimAccel, out float dvx, out float dvz);
+            float settled = SwimDrift.SteadyStateDrift(dvx, swimAccel);
+            Check(Math.Abs(settled - 1f) < 1e-4f,
+                $"a 1 m/s current settles a swimmer at 1 m/s, not 20 ({Fmt(settled)})");
+
+            // Simulated rather than reasoned about: run vanilla's own lerp and see where it goes.
+            float v = 0f;
+            for (int i = 0; i < 4000; i++)
+            {
+                v = v + swimAccel * (0f - v);   // lerp toward zero intent (treading water)
+                v += dvx;                        // our per-frame addition
+            }
+            Check(Math.Abs(v - 1f) < 0.01f,
+                $"simulating vanilla's lerp converges on the intended drift ({Fmt(v)})");
+
+            // ---- THE DROWNING GUARD, swept across the entire config range -------------------
+            // A safety property, not a balance dial: at every legal setting a swimmer must still
+            // out-swim the water. If this ever fails, someone can be pinned offshore until they
+            // drown, and that is a broken feature rather than a mistuned one.
+            bool alwaysEscapable = true;
+            float worstRatio = 0f;
+            for (float f = 0f; f <= 1.0f; f += 0.05f)
+            for (float c2 = 0f; c2 <= 0.9f; c2 += 0.05f)
+            for (float water = 0f; water <= 5f; water += 0.25f)
+            {
+                SwimDrift.Compute(water, 0f, f, swimSpeed, c2, swimAccel, out float x, out _);
+                float drift = SwimDrift.SteadyStateDrift(x, swimAccel);
+                float ratio = drift / swimSpeed;
+                if (ratio > worstRatio) worstRatio = ratio;
+                if (drift >= swimSpeed) alwaysEscapable = false;
+            }
+            Check(alwaysEscapable,
+                $"across every legal config a swimmer out-swims the current (worst {Fmt(worstRatio)} of swim speed)");
+            Check(worstRatio <= 0.9f + 1e-4f,
+                $"the cap is honoured at the extreme of the range ({Fmt(worstRatio)})");
+
+            // At the SHIPPED defaults, with the fastest water the field can produce.
+            SwimDrift.Compute(1.2f, 0f, factor, swimSpeed, cap, swimAccel, out float defX, out _);
+            float defaultDrift = SwimDrift.SteadyStateDrift(defX, swimAccel);
+            Check(defaultDrift < swimSpeed * 0.4f,
+                $"at shipped defaults the worst drift is well under swim speed ({Fmt(defaultDrift)} vs {swimSpeed})");
+            Check(defaultDrift > 0.2f,
+                $"and is still enough to feel ({Fmt(defaultDrift)} m/s)");
+
+            // ---- direction, and the degenerate cases ---------------------------------------
+            SwimDrift.Compute(-0.6f, 0.8f, factor, swimSpeed, cap, swimAccel, out dvx, out dvz);
+            Check(Math.Abs(dvx / dvz + 0.6f / 0.8f) < 1e-4f, "the drift preserves the current's bearing");
+
+            SwimDrift.Compute(0f, 0f, factor, swimSpeed, cap, swimAccel, out dvx, out dvz);
+            Check(dvx == 0f && dvz == 0f, "still water moves no swimmer");
+
+            SwimDrift.Compute(1f, 0f, 0f, swimSpeed, cap, swimAccel, out dvx, out dvz);
+            Check(dvx == 0f && dvz == 0f, "SwimmerDriftFactor 0 leaves swimmers alone entirely");
+
+            SwimDrift.Compute(1f, 0f, factor, swimSpeed, 0f, swimAccel, out dvx, out dvz);
+            Check(dvx == 0f && dvz == 0f, "a zero cap leaves swimmers alone entirely");
+
+            SwimDrift.Compute(1f, 0f, factor, swimSpeed, cap, 0f, out dvx, out dvz);
+            Check(dvx == 0f && dvz == 0f && !float.IsNaN(dvx),
+                "a zero swim acceleration does not divide by zero");
+
+            Check(SwimDrift.SteadyStateDrift(1f, 0f) == 0f, "steady state with no acceleration is zero, not infinity");
         }
 
         private static float AngleBetween(FieldSample a, FieldSample b)

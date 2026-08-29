@@ -32,7 +32,7 @@ namespace RavenIron.Undertow
     {
         public const string PluginId      = "com.raveniron.undertow";
         public const string PluginName    = "Undertow";
-        public const string PluginVersion = "0.4.2";
+        public const string PluginVersion = "0.5.0";
 
         public static Undertow Instance { get; private set; }
         public static ManualLogSource Log { get; private set; }
