@@ -41,17 +41,44 @@ pre-rewrite SHAs still return content through the API. That is normal GitHub beh
 unreferenced objects survive until their garbage collector runs, which is not on a schedule you
 control.
 
-Two ways to finish it:
+### The decision is made, and the exact next action is one command
 
-1. **Delete the remote repo and recreate it, pushing only the clean history.** Definitive and
-   entirely within your control. Costs nothing here: the repo was created the same day, has no
-   stars, forks or collaborators. This is the recommended path.
-2. **Ask GitHub Support to run garbage collection** on the repo. Their documented remedy, but it
-   is a support ticket and a wait.
+**The owner chose: delete the remote repo and recreate it**, pushing only the clean history.
+Definitive and entirely under our control — the repo was created the same day and has no stars,
+forks or collaborators, so nothing is lost.
 
-Doing neither is also defensible — the old SHAs are not discoverable without having recorded
-them during a roughly twenty-minute public window — but that is a judgement call for the owner,
-not an assumption for the next session to make.
+**It is blocked on a token scope.** `gh repo delete` returns:
+
+```
+HTTP 403: Must have admin rights to Repository.
+This API operation needs the "delete_repo" scope.
+```
+
+The token carries `gist, read:org, repo, workflow`. Granting the scope needs a browser
+authorization only the owner can complete:
+
+```
+gh auth refresh -h github.com -s delete_repo
+```
+
+**Once that is done, the whole remaining sequence is:**
+
+1. `gh repo delete RavenIron/Undertow --yes`
+2. `gh repo create RavenIron/Undertow --private --source=. --remote=origin --description "The sea gets its own motion. Currents, tides and storm surge for Valheim. A Raven Iron mod."`
+3. `git push -u origin main`
+4. Verify the old SHAs 404 — they are `4c8d698 705e595 7ebdbf1 13e128a 110fa5d 397c502 802aab3`,
+   checked with `gh api repos/RavenIron/Undertow/commits/<sha>`. **Verify this rather than
+   assuming it**, since the whole point of the exercise is that a force-push did NOT achieve it.
+5. `gh repo edit RavenIron/Undertow --visibility public --accept-visibility-change-consequences`
+
+**If the owner would rather not grant `delete_repo`**, there is a route needing no new scope:
+rename the current repo to `Undertow-archive-prescrub` (stays private, keeps the old objects),
+create a fresh `Undertow`, push the clean history there, and delete the archive from the web UI
+later. Same end state — the public URL holds only clean objects — one loose end to tidy.
+
+Doing neither is also defensible: the old SHAs are not discoverable without having recorded them
+during a roughly twenty-minute public window. But that is the owner's call, not an assumption
+for the next session to make.
 
 **A local safety net exists:** branch `backup-pre-scrub` and the folder
 `../Undertow-backup-prescrub` both hold the ORIGINAL unscrubbed history. Never push either.
