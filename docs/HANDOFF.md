@@ -100,11 +100,19 @@ Delete them once you are satisfied.
    postfix runs last, so a push lands on top of whatever they did. Run task 2's acceptance
    twice, with and without, and compare displacement. If they fight, the answer is a
    default-off compatibility toggle, never a priority war (house rule 1).
-4. **The client-blind season.** `SeasonSystem.Current` is only assigned in RW's `Tick()`, which
-   RW gates on the simulation authority, so every client computes the field as spring. Boats do
-   not desync (all clients agree with each other) but the seasonal shift is inert away from a
-   listen host. **The fix belongs in Ragnarok's Wrath** — syncing its season — not in a second
-   season clock here, which is exactly the conflict house rule 4 exists to prevent.
+4. **The client-blind season — BUILT 2026-08-30, awaiting one in-game run.**
+   `SeasonSystem.Current` was only assigned in RW's `Tick()`, which RW gates on the simulation
+   authority, so every client computed the field as spring. Boats never desynced (all clients
+   agreed with each other) but the seasonal shift was inert away from a listen host. The fix
+   belonged in Ragnarok's Wrath — syncing its season — not in a second season clock here, which
+   is exactly the conflict house rule 4 exists to prevent. **RW 0.25.0 does it**: `Net/SeasonSync`
+   broadcasts the season to everyone on SeasonSystem's own 10s cadence, absolute and
+   unconditional, and `wrath status` now names the season's SOURCE so a client can tell a
+   working sync from the spring-shaped hole it leaves when it fails. Undertow is unchanged and
+   needs no version floor. **To verify:** deploy RW 0.25.0 to the server AND the client, get the
+   world past day `SeasonLengthDays` so the season is not legitimately spring, then on the client
+   type `wrath status` (RW's console) for `synced from the server`, and `wake here` to confirm
+   the field's seasonal term moved with it.
 5. **Tuning, once real players have sailed it.** `MaxCurrentSpeed` (1.2 m/s) is the headline
    dial and has never been judged by anyone but its author. `FlotsamPerHour` ships at 6/hour,
    which is deliberately sparse.

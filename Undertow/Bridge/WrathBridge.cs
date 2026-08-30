@@ -25,7 +25,12 @@ namespace RavenIron.Undertow.Bridge
     /// TWO DIFFERENT ROUTES, FOR A MEASURED REASON. The SEASON comes from RW by reflection. The
     /// STORM does not: it comes from vanilla's own replicated RandomEvent, because RW's storm
     /// state is only maintained on the simulation authority and is dead on every client. See
-    /// IsStormAt. The season has the same limitation and no such workaround - documented there.
+    /// IsStormAt. The season had the same limitation and no workaround available from this side;
+    /// it was fixed where it belonged instead, in Ragnarok's Wrath 0.25.0, which now broadcasts
+    /// the season to every client (`RW Net/SeasonSync`). Nothing changed here: the reflected read
+    /// below is unaltered and simply starts getting a true answer. Against an older RW it reads
+    /// spring, exactly as it always did, so there is no version floor and nothing to detect.
+    /// NOT YET VERIFIED IN-GAME on either side as of 2026-08-30.
     ///
     /// DETERMINISM, AND ITS ONE HONEST LIMIT. The rest of the field is identical on every
     /// machine, which is why the mod needs no sync. Storm surge is not: a peer without RW

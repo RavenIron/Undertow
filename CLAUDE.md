@@ -44,10 +44,18 @@ its fix. Verified in-game on a dedicated server and a client (2026-08-28).
 testing against other boat mods: every measurement so far is a clean baseline taken with none
 installed.
 
-**KNOWN LIMIT: RW's season is client-blind.** `SeasonSystem.Current` is set only in `Tick()`,
-which RW gates on the simulation authority, so every client computes the field as spring. Boats
-do not desync (all clients agree) but the seasonal shift is inert away from a listen host. The
-fix is RW syncing its season, NOT a second season clock here — see rule 4.
+**KNOWN LIMIT — FIX BUILT NEXT DOOR, NOT YET VERIFIED. RW's season was client-blind.**
+`SeasonSystem.Current` is set only in `Tick()`, which RW gates on the simulation authority, so
+every client computed the field as spring. Boats do not desync (all clients agree) but the
+seasonal shift was inert away from a listen host. The fix belongs in RW, NOT a second season
+clock here — see rule 4 — and as of 2026-08-30 it exists there: **Ragnarok's Wrath 0.25.0 adds
+`Net/SeasonSync`**, which broadcasts the season to every client on a 10s cadence. Nothing in
+Undertow changed and nothing here needs to: `WrathBridge` reads `SeasonSystem.Current` exactly
+as before and simply starts getting a true answer. Against an older RW it still reads spring,
+which is the same behaviour as today, so there is no version floor to enforce.
+**Neither side is verified in-game yet.** The check is one dedicated-server session: a client
+types `wrath status` (RW's console, not ours) and reads back a non-spring season marked
+`synced from the server`, then `wake here` and confirm the field's seasonal term moved with it.
 
 **The model took three attempts and every one was killed by a measurement, not by review.** The
 reasoning is in `Core/DriftForce.cs`; read it before touching the force. Three separate
