@@ -288,6 +288,102 @@ removal will not join.
 Then the `CLAUDE.md` entry loses its ⚠️, gains a date, and Ravenrest's every boat number so far
 is retroactively a "with Sailing" number — which they already were.
 
+## 2d. Compatibility: Njord (Wubarrk) — ANALYSED 2026-09-02 FROM DOCS ONLY, NOT MEASURED
+
+The third named compatibility, and the one that actually matches the shape `CLAUDE.md`'s
+boat-mod warning describes: configurable sail and acceleration forces, per-hull speed caps, an
+"overhauled physics curve". **It is ON RAVENREST at 1.3.5**, so — as with Sailing — every boat
+number Undertow has measured there was taken with it present.
+
+**This entry is held to a weaker standard than 2c and 5c, and says so.** Njord publishes no
+source: `website_url` is a Discord invite, the Thunderstore page links no repository, and the
+README's licence reserves modification to the author. Nothing here comes from the shipping DLL,
+by rule. What follows is reasoned from three published things — the README, the changelog and
+the Ravenrest config — plus properties of Unity physics and of our own code. Two questions
+only the author or a measurement can answer are named at the end.
+
+**Ravenrest config, the parts that touch physics:** `Wind_AlwaysFull = true`,
+`AccelerationMultiplier 2.2`, `BaseForwardForce 0.85`, `SailForwardForce 0.3`,
+`HalfSailForce 1.2`, `FullSailForce 4.2`, `ReverseKick 1.8`, `SteeringMultiplier 1.85`, caps
+Raft 7 / Karve 16.8 / Longship 26 / Drakkar 30. The changelog says the Longship and Drakkar
+caps only started applying in 1.3.4 — "crews used to these two hulls will feel them slow down".
+
+### What can be said without the source
+
+1. **Our push and Njord's cap never meet, by arithmetic.** `DriftForce.Compute`'s saturation
+   term is `1 − hullAlong / waterSpeed`, clamped to [0,1], so the push is exactly zero whenever
+   the hull already moves along the current faster than the water — at most 1.92 m/s (1.2 max
+   current × 1.6 storm surge). Njord's lowest cap is 7. There is no speed at which both act on
+   a down-current hull. Up-current at the cap, our push is full but opposes the hull's motion,
+   which no clamp on speed magnitude fights.
+2. **Even where a clamp and a push coincide, the overshoot is one tick.** Our write is
+   `AddForce(..., Impulse)`, which Unity integrates at the physics step AFTER every FixedUpdate
+   patch has run. So wherever Njord's cap lives inside `CustomFixedUpdate`, it sees the hull
+   BEFORE our impulse lands, and the most a hull can sit above the cap is one tick's `dv`:
+   `water × DriftStrength × dt = 1.2 × 1.0 × 0.02 ≈ 0.024` m/s, 0.038 in a storm. Vanilla's own
+   sail and rudder impulses have the same relationship to any in-tick clamp, and are larger.
+3. **If Njord replaces vanilla's update outright, we still run.** A prefix that skips the
+   original does not skip postfixes. Ours still re-checks `IsOwner()`, still reads the field,
+   still adds force. What changes is the DAMPING our push settles against — and that is the
+   whole reason the model is saturation rather than a calibrated push: "the equilibrium is set
+   by this term rather than by a race between our push and vanilla's damping". Njord's damping
+   would be the first non-vanilla damping that claim has met. The honest statement of the
+   claim: with damping small next to `DriftStrength`, every hull settles near the water's
+   speed (vanilla measured 0.86 and 0.96); with damping comparable to it, the settled ratio
+   drops — linear damping `c` gives `1/(1+c)`. That is a TUNING outcome (`DriftStrength` up on a
+   Njord server), not a conflict, and the ratio is the number that decides it.
+4. **Propulsion versus water, again.** Njord's forces drive the hull; ours is the water it sits
+   in. We push at the centre of mass with no torque, so `SteeringMultiplier` and the helm are
+   untouched. `Wind_AlwaysFull` changes what the SAIL sees, not `EnvMan`'s wind, and Undertow
+   drives no hull by wind in any case.
+5. **BarrkBOT, cosmetic.** The export samples helmed hulls above `Barrkbot_MinSpeed` (1 m/s)
+   and the odometer accumulates on the owning peer. A helmed hull drifting at full current
+   therefore banks a ~1.2 m/s "record" and some distance without a sail up, until the first real
+   sail overwrites the record. Off by default; on Ravenrest it is off.
+6. **Unattended hulls.** Njord's 1.3.3 note says a hull "loses power once you actually step
+   off the boat". Our `UnattendedDriftFactor` is 0, so we never push an empty hull whatever
+   Njord does to it.
+
+### The two things only the author or a measurement can answer
+
+- **Does Njord replace `Ship.CustomFixedUpdate`, or decorate it?** Decides whether vanilla's
+  damping is still what we settle against (point 3).
+- **Where and how does the cap act** — a velocity clamp in the tick, a force scale, a drag
+  term above the cap? Decides whether point 2's one-tick bound is the whole story.
+
+Neither changes the compatibility verdict; both change how sharply it can be stated.
+
+**No code was changed and none should be until this is measured.** If the settled ratio under
+Njord is well below vanilla's, the first response is `DriftStrength` on that server, not a
+toggle. If something fights that no damping explains, the answer is a default-off
+compatibility toggle, never a priority war.
+
+### Measurement protocol
+
+Task 2's verification protocol, on Ravenrest, where "with" is the default. Njord is
+ServerSync-pinned to its own version, so "without" means parking `Wubarrk-Njord` on the server
+AND in the client profile for one session.
+
+1. **Drifting, with.** Sail down, from known water (`wake here`), on a Karve. Watch the
+   2-second `drift` log line settle and record `ALONG-RATIO`. This is the number: vanilla gave
+   0.86 (karve) and 0.96 (longship). Near those, point 3's claim holds under Njord's physics.
+   Well below — 0.6, say — and Njord's damping is doing what point 3 warned; try
+   `DriftStrength` 2.0 and re-measure before concluding anything.
+2. **Drifting, without.** Same spot, same hull, Njord parked both sides. The pair of ratios
+   from 1 and 2 IS the compatibility result.
+3. **Down-current at the cap.** Full sail along the bearing until the HUD sits at 16.8. Confirm
+   the log line's `dv` reads 0 the whole time the hull is above the water's speed — point 1,
+   visible. If `dv` is non-zero with `along` above `water`, the saturation clamp is broken and
+   that is OUR bug, not Njord's.
+4. **Up-current at the cap.** Same, against the bearing. `dv` full, hull still makes headway,
+   and nothing judders: a magnitude cap and an opposing push coexisting.
+5. **The one-tick bound.** With Debug off this is invisible and that is the point. If Njord's
+   own HUD ever shows a hull sitting more than ~0.05 m/s above its cap while drifting
+   down-current, point 2 is wrong about where the cap acts — note it, and ask the author.
+
+**Acceptance:** step 1 near vanilla's ratios or explained by `DriftStrength`; steps 3 and 4
+as described. Then the `CLAUDE.md` entry loses its ⚠️ and gains the ratio under Njord.
+
 ## 2z. Original task 2 build notes (superseded)
 
 Built, unit-tested (**83/83**, every assertion proven to fail without its fix), and confirmed

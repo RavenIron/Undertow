@@ -306,6 +306,31 @@ fades the push out sooner, which is the model working, not a conflict; the anti-
 means we can never slow the boost. The nudge is an ordinary impulse on the same rigidbody and
 sums with ours. It declares incompatibility only with Valheim Plus.
 
+**Njord (Wubarrk)** — the ship-handling overhaul, and it is ON RAVENREST (1.3.5, `Wind_AlwaysFull`
+on, caps Raft 7 / Karve 16.8 / Longship 26 / Drakkar 30 m/s). ⚠️ **EXPECTED TO COMPOSE, NOT YET
+MEASURED — AND THIS IS THE ONE THE BOAT-MOD WARNING ABOVE WAS WRITTEN FOR.** Configurable sail
+and acceleration forces, per-hull speed caps, an overhauled physics curve. **No public source:
+its website is a Discord invite and its licence reserves modification to the author, so nothing
+here comes from its DLL, by rule.** Everything below is from its published README, changelog and
+the Ravenrest config; `docs/BACKLOG.md` task 2d has the protocol. What can be said without the
+source: our push is an `AddForce(Impulse)`, which integrates at the physics step AFTER every
+`FixedUpdate` patch has run, so wherever Njord's cap clamps, it sees the hull before our push
+lands and the overshoot is one tick's `dv` — `water × DriftStrength × dt ≈ 0.024` m/s at full
+current, 0.038 in a storm — against caps of 7 to 30. But the cap and the push never actually
+meet: our saturation term is ZERO whenever the hull already moves along the current faster than
+the water (≤ 1.92 m/s, ever), and Njord's caps begin at 7. Up-current at the cap the push is
+full but points against the hull's motion, which no magnitude clamp fights. If Njord REPLACES
+vanilla's `CustomFixedUpdate` outright (unknown), our postfix still runs, still re-checks
+`IsOwner()`, and still adds force — and the saturation model was built precisely so the
+equilibrium is set by our term rather than by a race with the hull's damping. Njord's damping
+is the first non-vanilla damping that claim has ever met, which makes task 2's `ALONG-RATIO`
+under Njord the single most informative number left to measure. Its forces are propulsion, ours
+is water; we push at the centre of mass with no torque, so `SteeringMultiplier` is untouched;
+`Wind_AlwaysFull` is a SAIL change, not an `EnvMan` one, and we drive no hull by wind. One
+cosmetic contact: BarrkBOT's export samples helmed hulls above 1 m/s, so a helmed hull drifting
+at full current can bank a ~1.2 m/s "record" and odometer distance until the first real sail
+overwrites it. Both mods are ServerSync-pinned, so a without-run parks Njord on BOTH sides.
+
 **AwayFromHome (Wubarrk)** — no known interaction, since nothing here ticks on zone load state
 and nothing spawns in unloaded ocean. Keep it that way: flotsam requires a real player nearby.
 
