@@ -267,6 +267,26 @@ fight, the answer is a default-off compatibility toggle, never a priority war (h
 **Boat stat mods** (cargo, speed, durability) should compose without contact: they change the
 hull, Undertow changes the water.
 
+**Dive In (sighsorry)** — the diving mod; 1.2.0 sits in the owner's `Wonderland` Gale profile,
+not on Ravenrest. ⚠️ **EXPECTED TO COMPOSE, NOT YET MEASURED.** Read from its published
+GPL-3.0 source (<https://github.com/sighsorry1029/DiveIn>, last push 2026-08-08), never from
+its DLL — see `docs/BACKLOG.md` task 5c for the protocol. Its whole contact with us is inside
+`Character.UpdateSwimming`, the method our swimmer postfix decorates: a prefix that steers the
+LOCAL player's `m_moveDir` and temporarily scales `m_swimSpeed` (skill up to x1.5, fast swim x2,
+encumbered x0.5), and a postfix/finalizer pair that restores both. **It never writes
+`m_currentVel`, never replaces or skips vanilla's lerp, and never touches `m_swimAcceleration`**
+— so our per-frame addition lands on an unchanged servo and the 1/acceleration cancellation
+still holds. All its patches run at default priority, as does ours, so which postfix runs first
+is decided by load order, and the only thing that changes is which `m_swimSpeed` our cap sees.
+Worked at defaults: the strongest drift we ever ask for is `1.2 × 1.6 × 0.5 = 0.96` m/s; the
+cap is `0.35 × swimSpeed` as seen, from **0.35** (encumbered, seen) to **0.70** (restored);
+the swimmer's real speed is at least **1.0** (encumbered) — so the drowning guard holds in
+both orderings, but the encumbered-in-a-storm margin is 0.3 m/s where it is normally tenfold.
+Ships, `WaterVolume` state we read, flotsam and creatures are untouched: it patches no `Ship`
+member, its `WaterVolume` prefix is visual and we read no water-surface state, and its monster
+diving is `MonsterAI`/`BaseAI` work our players-only gate never sees. It declares no
+`BepInIncompatibility` against anything of ours.
+
 **AwayFromHome (Wubarrk)** — no known interaction, since nothing here ticks on zone load state
 and nothing spawns in unloaded ocean. Keep it that way: flotsam requires a real player nearby.
 

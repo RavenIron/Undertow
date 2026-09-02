@@ -527,6 +527,89 @@ have moved at roughly 3.4 m/s instead of 0.16.
 
 **The drowning guard has a tenfold margin.** While actually swimming the player held 1.9-2.0 m/s
 — full swim speed — against a 0.17 m/s current. Nobody can be pinned offshore.
+## 5c. Compatibility: Dive In (sighsorry) — ANALYSED 2026-09-02, NOT MEASURED
+
+The owner asked for this one by name. It is the first specific mod Undertow has been checked
+against, and it is checked the way `CLAUDE.md` demands: from the author's **published source**
+(GPL-3.0, <https://github.com/sighsorry1029/DiveIn>, last push 2026-08-08, version 1.2.0) and
+never from a decompile of the shipping DLL. Nothing of theirs is reproduced here — only which
+vanilla members they touch, which is the same standard RW's shudnal-Seasons entry was held to.
+
+**Where it is:** `Wonderland` Gale profile, plugins and both config files. Not on Ravenrest
+and not in any Ravenrest profile, so the measurement happens on Wonderland or after adding it.
+
+### What it does to the method we patch
+
+Everything Dive In does to a player swimmer happens inside `Character.UpdateSwimming` — our
+postfix's method — and it is all default priority, as ours is:
+
+- A **prefix** that, for the LOCAL player only, temporarily scales `m_swimSpeed` (swim skill
+  up to x1.5, fast swim x2, encumbered x0.5, all config) and, while ascend/descend is held,
+  steers `m_moveDir` to include a vertical component. Depth is then adjusted through
+  `m_swimDepth`, which vanilla already uses for how deep a swimmer sits.
+- A **postfix and a finalizer** that restore `m_swimSpeed` and `m_moveDir`.
+- A second **postfix** that only sets animator bools while blocking underwater.
+
+**It never writes `m_currentVel`, never replaces or skips vanilla's lerp, and never changes
+`m_swimAcceleration`.** That is the whole finding. Our per-frame addition therefore lands on
+an unchanged servo, the `1/m_swimAcceleration` cancellation in `SwimDrift` still holds, and
+the two mods compose linearly: the swimmer's intent (theirs, possibly boosted) plus the water
+(ours). It touches no `Ship` member, so drift is untouched; its `WaterVolume` prefix is purely
+visual and we read no water-surface state; its creature diving is `MonsterAI`/`BaseAI` work
+our players-only gate never sees; it declares no `BepInIncompatibility` against us.
+
+### The one ordering-dependent detail, worked through
+
+Both postfixes are default priority, so **load order decides which runs first**, and the only
+consequence is which `m_swimSpeed` our drowning-guard cap reads: the scaled value (if we run
+before their restore) or the vanilla one (if after). At shipping defaults:
+
+| Quantity | Value |
+|---|---|
+| Strongest drift ever requested (`1.2 × 1.6 storm × 0.5 factor`) | **0.96 m/s** |
+| Cap, vanilla `m_swimSpeed` 2.0 seen (`× 0.35`) | 0.70 |
+| Cap, encumbered 1.0 seen | 0.35 |
+| Cap, fast+skill 6.0 seen | 2.1 (drift stays 0.96 — never asked for more) |
+| Swimmer's real speed: vanilla / encumbered / fast | 2.0 / 1.0 / 4.0–6.0 |
+
+The guard holds in every cell — drift never reaches the swimmer's real speed — but the
+**encumbered diver in a storm** case is the tight one: 0.70 of drift against 1.0 of swim if we
+read the restored value, a 0.3 m/s headway where the design normally has tenfold. Dive In
+already makes encumbered swimming a stamina emergency, so this is unlikely to be the thing
+that drowns anyone; it is the case to measure first precisely because it is the worst.
+
+**No code was changed and none should be until this is measured.** If the tight case turns
+out to matter, the answer is the one `CLAUDE.md` prescribes — a default-off compatibility
+toggle (most likely "read the cap against vanilla swim speed only") — never a priority war.
+
+### Measurement protocol
+
+Task 5's acceptance, run with Dive In alongside. One client, both mods, `VerboseLogging =
+true`; the 3-second `swim drift` log line is the instrument, exactly as in task 5.
+
+1. **Control.** Float idle at the surface in known water (`wake here` first). Read the line:
+   `drift` is the computed value, `swimmer` the measured. Task 5's clean baseline was 0.172
+   computed / 0.164 measured. The pair should still agree to within ~10%.
+2. **Which ordering did you get?** The same line prints `swimSpeed`. Hold fast swim while
+   idle-ish: if it prints 4 (or 3, or 6) our postfix runs BEFORE their restore; if it stays 2,
+   after. Record it — the answer is load-order dependent and may differ per profile.
+3. **Diving idle.** Descend and hold depth mid-water, no horizontal input. `swimmer` should
+   again match `drift`: the current carries a diver exactly as it carries a floater, since
+   the field is planar and depth is theirs.
+4. **Diving against it.** Swim into the current at depth. The swimmer's speed should be their
+   swim speed minus the drift, and positive — a diver must always be able to make headway.
+5. **The tight case.** Encumbered, in the strongest water you can find (a storm over deep sea
+   if RW obliges), underwater. Confirm headway is still possible before stamina runs out.
+   If it is not, that is the toggle case above — and note that an encumbered diver in a storm
+   drowns in Dive In alone; separate the two before blaming the current.
+6. **No amplification.** At no point should `swimmer` exceed `drift` by more than wave noise
+   while idle. A reading near 20x is the trap `SwimDrift` exists to cancel; if it appears,
+   something has changed the lerp and this analysis is stale — re-read their source at the
+   commit they shipped.
+
+**Acceptance:** steps 1, 3 and 4 agree with the computed drift the way task 5 did; step 5
+leaves headway. Then the `CLAUDE.md` entry loses its ⚠️ and gains a date and a number.
+
 ## 5z. Original task 5 specification (its AddPushbackForce advice was WRONG - see above)
 
 Last, deliberately: the highest-annoyance surface in the mod, and it wants the most tuning
