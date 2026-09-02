@@ -803,11 +803,17 @@ is wrong**, not the tuning.
 
 ## Open questions
 
-- **Which vanilla item prefabs carry `Floating`?** Blocks task 4 entirely. Answerable in one
-  in-game session; do it early even though the system ships late.
-- **Does the mod have to be on every client?** Boat physics runs on the owning peer, which is
-  a player's machine, so an unmodded client sails a currentless sea. Leaning: required on
-  server and clients, version-gated the way RW does it. Settle it before the first release.
+- **Which vanilla item prefabs carry `Floating`?** SETTLED 2026-08-28 — 123 of 1090, measured
+  headless before the spawner was written; see task 4.
+- **Does the mod have to be on every client?** SETTLED for 0.5.1: **yes, server and every
+  client**, and the README and CHANGELOG both say so. Boat physics runs on the owning peer, so
+  an unmodded client sails a currentless sea; flotsam spawns on the server, so a client-only
+  install gets currents and no wreckage. **Not version-gated**, deliberately for now: the field
+  is a pure function of seed, position, clock, season and config, so a version-skewed pair
+  behaves exactly like the config-mismatch case the README already warns about — each machine
+  computes its own ocean, and no hull desyncs because one peer owns it. Revisit the day a
+  release changes the field's maths, since that is when two versions would disagree about the
+  same water; RW's `VersionSync` (warn once, never kick) is the pattern to copy.
 - **Does Moder's wind control exempt you from the current?** Leaning strongly no —
   "Moder gives you the wind, not the sea". Locked in `CLAUDE.md` unless argued otherwise.
 - **Should the field ever be persisted?** Leaning no for v1. It is a pure function today,

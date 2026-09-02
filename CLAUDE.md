@@ -76,16 +76,20 @@ the same script is a liability.
 ```powershell
 .\tools\fetch-libs.ps1     # once per machine: copies game/BepInEx DLLs into libs\
 .\tools\run-tests.ps1      # off-game logic tests (net10) — run before every commit
+.\tools\package.ps1        # release zip; refuses on version drift, missing store files, wrong icon size
 ```
 
 ```powershell
 dotnet build .\Undertow\Undertow.csproj -c Debug
 ```
 
-`tools\package.ps1` is **deliberately not ported yet**. RW's version refuses to package unless
-the plugin const, the csproj `<Version>` and `manifest.json` all agree — a guard worth having,
-and worth having on a real release rather than on a skeleton. It arrives with the first
-publishable build, along with `manifest.json`, `README.md`, `CHANGELOG.md` and an icon.
+`tools\package.ps1` builds `dist\RavenIron-Undertow-<version>.zip` and **refuses** on any of
+three mistakes a hand-made zip invites: the plugin const, the csproj `<Version>` and
+`manifest.json` disagreeing; a store file missing (`manifest.json`, `README.md`, `CHANGELOG.md`,
+`icon.png`); or an icon that is not exactly 256x256, which Thunderstore rejects late and
+without saying why. Every guard was tested by breaking it on purpose. Build releases with it,
+never by hand — it also writes the zip entries itself, because PS 5.1's `Compress-Archive`
+produces archives Hexium's parser rejects.
 
 To inspect a game member — signature, accessibility, default values, or the actual method
 body — decompile it. `dotnet tool install -g ilspycmd`, then:
@@ -102,7 +106,7 @@ already exists, and ships and swimmers need opposite injection mechanisms.
 
 ## Layout
 
-Planned. Mirrors Ragnarok's Wrath, because a reader who knows one should be able to read the
+Mirrors Ragnarok's Wrath, because a reader who knows one should be able to read the
 other without relearning anything.
 
 ```
@@ -449,8 +453,11 @@ Verified by decompile 2026-08-28 unless marked otherwise.
   changes faster than 2.5 m/s, at most once per 2s. Anything that moves boats inherits this
   consequence for free — and could amplify it by accident.
 
-- ⚠️ **UNVERIFIED — which vanilla item prefabs carry `Floating`?** Blocks flotsam entirely.
-  One raft of sunken loot disproves the approach. Answer it in-game before writing a spawner.
+- **Which vanilla item prefabs carry `Floating`? ANSWERED 2026-08-28, headless: 123 of 1090.**
+  This was the question that could have sunk flotsam entirely — one raft of sunken loot
+  disproves the approach — so it was measured before a spawner was written, and the pool is
+  built from that scan rather than from a hand list. Driftwood was then seen floating on the
+  surface by the owner, which is the one step no log could settle.
 
 - **A mod adding a prefab MUST ship server-side** or `ZNetScene.CreateObjectsSorted` calls
   `DestroyZDO` on any hash it cannot resolve — silent data loss. We add no prefabs.
