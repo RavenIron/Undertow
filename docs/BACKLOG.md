@@ -211,6 +211,83 @@ Left alone deliberately.
 **Still open, needs a human:** compatibility testing against other boat mods. Everything
 measured so far is a clean baseline, taken with none installed.
 
+## 2c. Compatibility: Sailing (Smoothbrain) — ANALYSED 2026-09-02, NOT MEASURED
+
+The second named compatibility, and the one that matters most today: **Sailing is already on
+Ravenrest** (1.1.8, every hull at speed factor 1.5, nudge on at force 10), so every boat
+measurement Undertow makes there is made with it present. Same standard as task 5c: read from
+the author's published source (<https://github.com/blaxxun-boop/Sailing>), never from the
+shipping DLL, and nothing of theirs is reproduced here — only which vanilla members it touches.
+
+**The version gap, stated plainly.** The public source is 1.1.7; Ravenrest ships 1.1.8; the
+Thunderstore changelog is empty. The delta is unknown and stays unknown — the shipping DLL is
+not decompiled in this repo, by rule. The protocol below measures whatever 1.1.8 actually does.
+
+### What it does to a hull
+
+Nothing in the method we patch. It never touches `Ship.CustomFixedUpdate`, never caps a speed
+and never assigns a velocity — so **it is not the mod `CLAUDE.md`'s boat-mod warning was
+written about**. Its entire contact with a hull:
+
+- A **result-decorating postfix on `Ship.GetSailForce`**, default priority, our own house
+  pattern: the sail force is multiplied by `1 + skill × speedFactor` for the sailor at the
+  helm, up to 2.5x at skill 100 with the Ravenrest setting. It also drips skill XP on a timer.
+- **Prefixes on `Ship.Forward` and `ShipControlls.Interact`** that refuse a sail setting or the
+  helm below a configured skill level. Gates, not forces; all requirements are 0 on Ravenrest.
+- **The nudge:** a prefix on `Ladder.Interact` that, with Shift held, applies ONE impulse of
+  `10 × mass` along the player's facing, throttled to once a second. An ordinary `AddForce`
+  on the same rigidbody we push; physics sums them.
+- `WearNTear` health, `Minimap.Explore`, a skill float on the player's ZDO — no contact. It
+  declares `BepInIncompatibility` only with Valheim Plus.
+
+So Sailing changes **propulsion** and Undertow changes **the water** — the "boat stat mods
+compose without contact" case, and it holds by construction: `DriftForce.Compute` takes the
+water's velocity and the hull's component along it, and nothing about how the hull is driven.
+
+### Two predictions, and they are the test
+
+1. **Drifting is untouched.** With the sail down, `GetSailForce` returns zero, and 2.5 × 0 is
+   zero. Task 2's acceptance — `ALONG-RATIO` settling near 1.0 with the sail down — should
+   therefore read the **same to the second decimal** with Sailing installed or removed. This is
+   the cleanest compatibility prediction the mod has, and the one to run first.
+2. **Under sail, the saturation term does its job sooner.** A boosted hull running down-current
+   crosses the water's speed earlier, so `head` clamps to 0 and the push fades out earlier — the
+   drift contributes LESS to a fast hull, by design. Up-current, `head` clamps to 1 and the
+   push is exactly what it always was. The anti-braking clamp guarantees Undertow can never
+   slow the boosted hull; at worst it stops helping. If step 6 of task 2's protocol shows a
+   smaller on/off displacement under sail than the clean baseline did, that is this — not a
+   fight — and it should scale with how far above the water's speed the hull was running.
+
+**No code was changed and none should be until this is measured.** If the two runs disagree
+in a way the saturation model does not explain, the answer is a default-off compatibility
+toggle, never a priority war — and since the two mods patch different methods there is no
+ordering to fight over anyway.
+
+### Measurement protocol
+
+Task 2's verification protocol, run twice. Ravenrest already has Sailing, so "with" is the
+default and "without" means parking `Smoothbrain-Sailing` out of the server's plugins AND the
+client's profile for one session — it is server-enforced with a version floor, so a one-sided
+removal will not join.
+
+1. **Drifting, with.** Sail down, from known water (`wake here`), watch the 2-second `drift`
+   log line settle. Record the settled `ALONG-RATIO` and the hull type.
+2. **Drifting, without.** Same spot, same hull, Sailing parked. Prediction 1 says the two
+   ratios match. If they do not, the drifting case has a contact the source did not show,
+   and 1.1.8 differs from 1.1.7 in a way that matters — stop and measure before theorising.
+3. **Under sail, down-current, with.** Half sail along the reported bearing, 120 s. The
+   `along` figure will exceed `water` quickly; confirm `dv` reads 0 once it does — that is the
+   saturation clamp, visible.
+4. **Under sail, up-current, with.** Same, against the bearing. `dv` should stay at its full
+   value throughout, and the hull should still make headway: the boost is never braked.
+5. **The nudge.** Sail down, in the current, Shift + use the ladder once. The hull jumps,
+   `along` spikes, `dv` drops to 0 while the hull outruns the water, then recovers as vanilla
+   damps it back. One impulse, then the model resumes. Nothing to fix if it looks like that.
+
+**Acceptance:** step 2 matches step 1; steps 3 and 4 behave as predictions 1 and 2 describe.
+Then the `CLAUDE.md` entry loses its ⚠️, gains a date, and Ravenrest's every boat number so far
+is retroactively a "with Sailing" number — which they already were.
+
 ## 2z. Original task 2 build notes (superseded)
 
 Built, unit-tested (**83/83**, every assertion proven to fail without its fix), and confirmed

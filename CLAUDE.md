@@ -287,6 +287,25 @@ member, its `WaterVolume` prefix is visual and we read no water-surface state, a
 diving is `MonsterAI`/`BaseAI` work our players-only gate never sees. It declares no
 `BepInIncompatibility` against anything of ours.
 
+**Sailing (Smoothbrain)** — the sailing-skill mod, and it is ON RAVENREST (1.1.8, speed factor
+1.5 for every hull). ⚠️ **EXPECTED TO COMPOSE WITHOUT CONTACT, NOT YET MEASURED.** Read from its
+published source (<https://github.com/blaxxun-boop/Sailing>, which stops at 1.1.7 — see
+`docs/BACKLOG.md` task 2c for the gap), never from its DLL. **It is NOT the "adds force to the
+hull and caps its speed" mod the paragraph above warns about.** It never patches
+`Ship.CustomFixedUpdate` and never caps anything. Its whole effect on a hull is a
+result-decorating postfix on `Ship.GetSailForce` — our own house pattern — scaling the SAIL
+force by up to `1 + 1.5 = 2.5x` at skill 100 for the sailor at the helm, plus skill-gated
+prefixes on `Ship.Forward` and `ShipControlls.Interact` that refuse a sail setting or the helm,
+and a "nudge": one impulse of `10 × mass` along the player's facing, at most once a second,
+when they hold Shift and use the ladder. So Sailing changes the PROPULSION and Undertow changes
+the WATER, which is the boat-stat-mods case exactly. Two consequences worth knowing. With the
+sail down `GetSailForce` is zero and 2.5 × 0 is still zero, so **task 2's drifting acceptance
+should read IDENTICALLY with Sailing on or off** — the cleanest compatibility prediction this
+mod has. Under sail, a boosted hull reaches the water's speed sooner and our saturation term
+fades the push out sooner, which is the model working, not a conflict; the anti-braking clamp
+means we can never slow the boost. The nudge is an ordinary impulse on the same rigidbody and
+sums with ours. It declares incompatibility only with Valheim Plus.
+
 **AwayFromHome (Wubarrk)** — no known interaction, since nothing here ticks on zone load state
 and nothing spawns in unloaded ocean. Keep it that way: flotsam requires a real player nearby.
 
