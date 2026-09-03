@@ -13,7 +13,7 @@ Design document (the reasoning behind every locked decision):
 
 **Undertow 0.5.1. The roadmap is complete and every task is verified in-game** — unchanged
 since 2026-08-28. Harness **162/162**, clean build. `main` is `d621c5f`, in sync with the
-**private** `RavenIron/Undertow`. `tools\package.ps1` builds `dist\RavenIron-Undertow-0.5.1.zip`
+**public** (since 2026-09-03) `RavenIron/Undertow`. `tools\package.ps1` builds `dist\RavenIron-Undertow-0.5.1.zip`
 with the new shield icon and passes its own three guards.
 
 | Task | State |
@@ -28,49 +28,40 @@ with the new shield icon and passes its own three guards.
 | 2d Njord compat | **analysed from published docs only, NOT measured** |
 | 5c Dive In compat | **analysed from public source, NOT measured** |
 
-**Release check, 2026-09-02: not yet, but close, and almost nothing left is code.** Two gates:
-the repo scrub below, and one boat session on Ravenrest. Everything else is tidied.
+**Release check, 2026-09-02: not yet, but close, and almost nothing left is code.** One gate left:
+one boat session on Ravenrest. The repo went public on 2026-09-03. Everything else is tidied.
 
 ---
 
-## 🚨 THE ONE OPEN BLOCKER — unchanged, re-verified 2026-08-30
+## The scrub question — CLOSED 2026-09-03 by the owner's decision
 
-The repo is **PRIVATE and must stay that way until this is resolved.** It was briefly public
-carrying a decompile writeup of another author's shipping mod; the history was rewritten and
-force-pushed clean, but **GitHub still serves the old commit SHAs** — re-checked on 2026-08-30,
-all seven still returned content through the API. A force-push does not evict unreferenced
-objects; only GitHub's garbage collector does, on no schedule you control.
+The repo was briefly public on 2026-08-28 carrying a decompile writeup of another author's
+shipping mod. The working tree and every commit were scrubbed and force-pushed; GitHub kept
+serving the seven pre-rewrite SHAs, and the 2026-08-28 decision was to delete and recreate the
+repo before going public — blocked on a `delete_repo` token scope only the owner could grant.
 
-**The owner chose: delete the remote repo and recreate it.** It is blocked on a token scope.
-`gh repo delete` returns `HTTP 403 ... needs the "delete_repo" scope`; the token still carries
-only `gist, read:org, repo, workflow` (re-checked 2026-09-02). Granting it is a browser
-authorization only the owner can complete:
+**On 2026-09-03 the owner chose otherwise and made the current repo public themselves, in the
+web UI**, with the seven old SHAs still resolving (re-checked that morning: all seven). That is
+a decision, recorded here, not an oversight: the old objects are not discoverable without
+having recorded their SHAs during a roughly twenty-minute window five days earlier, nothing in
+this repo's history references them, and GitHub's garbage collector will eventually evict them.
 
-```
-gh auth refresh -h github.com -s delete_repo
-```
+**Consequences for the next session:**
 
-**Once that is done, the whole remaining sequence is:**
-
-1. `gh repo delete RavenIron/Undertow --yes`
-2. `gh repo create RavenIron/Undertow --private --source=. --remote=origin --description "The sea gets its own motion. Currents, tides and storm surge for Valheim. A Raven Iron mod."`
-3. `git push -u origin main`
-4. **Verify the old SHAs 404** — `4c8d698 705e595 7ebdbf1 13e128a 110fa5d 397c502 802aab3`,
-   each with `gh api repos/RavenIron/Undertow/commits/<sha>`. Verify rather than assume; the
-   whole point is that a force-push did NOT achieve it.
-5. `gh repo edit RavenIron/Undertow --visibility public --accept-visibility-change-consequences`
-   — **confirm with the owner before this one**; it is the outward-facing, irreversible step.
-
-**If the owner would rather not grant `delete_repo`:** rename the current repo to
-`Undertow-archive-prescrub` (stays private, keeps the old objects), create a fresh `Undertow`,
-push the clean history, delete the archive from the web UI later. Same end state, one loose end.
-
-**Local safety nets still in place:** branch `backup-pre-scrub` and the folder
-`../Undertow-backup-prescrub` hold the ORIGINAL unscrubbed history. Never push either. Delete
-them once satisfied — that is the owner's call, not the next session's.
-
-**Why it blocks release:** `manifest.json`'s `website_url` and the README's links point at the
-repo, so a store listing ships with a 404 on day one.
+- `website_url` and the README's links resolve (HTTP 200). A store listing no longer 404s.
+- The delete-and-recreate sequence and the `delete_repo` scope are **no longer needed**. Do not
+  run them; do not ask for the scope.
+- The seven SHAs — `4c8d698 705e595 7ebdbf1 13e128a 110fa5d 397c502 802aab3` — are kept here
+  only so a future check (`gh api repos/RavenIron/Undertow/commits/<sha>`) can confirm when GC
+  has run. There is nothing to do when it has.
+- The local safety nets, branch `backup-pre-scrub` and folder `../Undertow-backup-prescrub`,
+  still hold the ORIGINAL unscrubbed history. Never push either. They can go whenever the owner
+  says so; not before.
+- **Never put another author's decompiled implementation in this repo again.** Tasks 2c, 2d and
+  5c show the standard that replaced it: published source or published docs, cited, surfaces
+  named, code never reproduced.
+- The owner flips repo visibility themselves, in the web UI. Prepare, state what would change,
+  and hand over the path — do not run `gh repo edit --visibility`.
 
 ---
 
@@ -136,7 +127,7 @@ already warns about; revisit when a release changes the field's maths, copying R
 
 ## What remains, in order
 
-1. **Resolve the blocker above, then make the repo public.**
+1. ~~Resolve the blocker, then make the repo public.~~ **Done 2026-09-03** — public, by the owner's hand; see the closed section above.
 2. **One Ravenrest session, and it answers three things at once.** Njord and Sailing are
    already there, so the "with" runs are the default state. A karve, sail down, in known water
    (`wake here`), `VerboseLogging = true`, watch the 2s `drift` line settle: the `ALONG-RATIO`
