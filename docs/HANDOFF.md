@@ -1,7 +1,8 @@
-# Session handoff — 2026-08-28 (the mod was designed, built, verified and packaged in one day)
+# Session handoff — 2026-09-02 (picked up 2026-08-30: one fix next door, store art, three compatibility analyses, a release check)
 
 For the next session picking this up cold. Read `CLAUDE.md` first, then this. `docs/BACKLOG.md`
-carries per-task verification detail and the acceptance criteria each task was held to.
+carries per-task verification detail and the acceptance each task was held to; tasks 2c, 2d
+and 5c are new since the last handoff.
 
 Design document (the reasoning behind every locked decision):
 <https://claude.ai/code/artifact/e213f36d-fdcd-4695-a159-f8e4e1157323>
@@ -10,8 +11,10 @@ Design document (the reasoning behind every locked decision):
 
 ## Where things stand
 
-**Undertow 0.5.1. The roadmap is complete and every task is verified in-game.** Harness
-**162/162**, clean build, `RavenIron/Undertow` on GitHub, release zip built.
+**Undertow 0.5.1. The roadmap is complete and every task is verified in-game** — unchanged
+since 2026-08-28. Harness **162/162**, clean build. `main` is `d621c5f`, in sync with the
+**private** `RavenIron/Undertow`. `tools\package.ps1` builds `dist\RavenIron-Undertow-0.5.1.zip`
+with the new shield icon and passes its own three guards.
 
 | Task | State |
 |---|---|
@@ -21,40 +24,26 @@ Design document (the reasoning behind every locked decision):
 | 3 Wrath bridge | done — live storm surge x1.6 at centre, x1.0 at 800m |
 | 4 flotsam | done — spawns, caps, reclaims, **and floats** (seen by the owner) |
 | 5 swimmers | done — computed 0.172 vs measured 0.164, tenfold margin over drowning |
+| 2c Sailing compat | **analysed from public source, NOT measured** |
+| 2d Njord compat | **analysed from published docs only, NOT measured** |
+| 5c Dive In compat | **analysed from public source, NOT measured** |
 
-Release files exist: `manifest.json`, `README.md`, `CHANGELOG.md`, the owner's `icon.png`
-(256x256), and `tools/package.ps1` with three guards. `dist/RavenIron-Undertow-0.5.1.zip`
-builds clean.
+**Release check, 2026-09-02: not yet, but close, and almost nothing left is code.** Two gates:
+the repo scrub below, and one boat session on Ravenrest. Everything else is tidied.
 
 ---
 
-## 🚨 THE ONE OPEN BLOCKER — read this before making the repo public
+## 🚨 THE ONE OPEN BLOCKER — unchanged, re-verified 2026-08-30
 
-The repo is **PRIVATE right now and must stay that way until this is resolved.**
+The repo is **PRIVATE and must stay that way until this is resolved.** It was briefly public
+carrying a decompile writeup of another author's shipping mod; the history was rewritten and
+force-pushed clean, but **GitHub still serves the old commit SHAs** — re-checked on 2026-08-30,
+all seven still returned content through the API. A force-push does not evict unreferenced
+objects; only GitHub's garbage collector does, on no schedule you control.
 
-It was briefly public carrying a decompile writeup of another author's shipping mod. That was
-removed from the working tree, then removed from **every commit** by a `filter-branch` rewrite
-and force-pushed — the current history is clean, verified commit by commit.
-
-**GitHub still serves the OLD commit SHAs.** Measured after the force-push: all seven
-pre-rewrite SHAs still return content through the API. That is normal GitHub behaviour —
-unreferenced objects survive until their garbage collector runs, which is not on a schedule you
-control.
-
-### The decision is made, and the exact next action is one command
-
-**The owner chose: delete the remote repo and recreate it**, pushing only the clean history.
-Definitive and entirely under our control — the repo was created the same day and has no stars,
-forks or collaborators, so nothing is lost.
-
-**It is blocked on a token scope.** `gh repo delete` returns:
-
-```
-HTTP 403: Must have admin rights to Repository.
-This API operation needs the "delete_repo" scope.
-```
-
-The token carries `gist, read:org, repo, workflow`. Granting the scope needs a browser
+**The owner chose: delete the remote repo and recreate it.** It is blocked on a token scope.
+`gh repo delete` returns `HTTP 403 ... needs the "delete_repo" scope`; the token still carries
+only `gist, read:org, repo, workflow` (re-checked 2026-09-02). Granting it is a browser
 authorization only the owner can complete:
 
 ```
@@ -66,60 +55,140 @@ gh auth refresh -h github.com -s delete_repo
 1. `gh repo delete RavenIron/Undertow --yes`
 2. `gh repo create RavenIron/Undertow --private --source=. --remote=origin --description "The sea gets its own motion. Currents, tides and storm surge for Valheim. A Raven Iron mod."`
 3. `git push -u origin main`
-4. Verify the old SHAs 404 — they are `4c8d698 705e595 7ebdbf1 13e128a 110fa5d 397c502 802aab3`,
-   checked with `gh api repos/RavenIron/Undertow/commits/<sha>`. **Verify this rather than
-   assuming it**, since the whole point of the exercise is that a force-push did NOT achieve it.
+4. **Verify the old SHAs 404** — `4c8d698 705e595 7ebdbf1 13e128a 110fa5d 397c502 802aab3`,
+   each with `gh api repos/RavenIron/Undertow/commits/<sha>`. Verify rather than assume; the
+   whole point is that a force-push did NOT achieve it.
 5. `gh repo edit RavenIron/Undertow --visibility public --accept-visibility-change-consequences`
+   — **confirm with the owner before this one**; it is the outward-facing, irreversible step.
 
-**If the owner would rather not grant `delete_repo`**, there is a route needing no new scope:
-rename the current repo to `Undertow-archive-prescrub` (stays private, keeps the old objects),
-create a fresh `Undertow`, push the clean history there, and delete the archive from the web UI
-later. Same end state — the public URL holds only clean objects — one loose end to tidy.
+**If the owner would rather not grant `delete_repo`:** rename the current repo to
+`Undertow-archive-prescrub` (stays private, keeps the old objects), create a fresh `Undertow`,
+push the clean history, delete the archive from the web UI later. Same end state, one loose end.
 
-Doing neither is also defensible: the old SHAs are not discoverable without having recorded them
-during a roughly twenty-minute public window. But that is the owner's call, not an assumption
-for the next session to make.
+**Local safety nets still in place:** branch `backup-pre-scrub` and the folder
+`../Undertow-backup-prescrub` hold the ORIGINAL unscrubbed history. Never push either. Delete
+them once satisfied — that is the owner's call, not the next session's.
 
-**A local safety net exists:** branch `backup-pre-scrub` and the folder
-`../Undertow-backup-prescrub` both hold the ORIGINAL unscrubbed history. Never push either.
-Delete them once you are satisfied.
+**Why it blocks release:** `manifest.json`'s `website_url` and the README's links point at the
+repo, so a store listing ships with a 404 on day one.
+
+---
+
+## What this session did (2026-08-30 → 2026-09-02)
+
+**1. The client-blind season, fixed next door.** `SeasonSystem.Current` was only ever assigned
+on RW's simulation authority, so every client computed Undertow's field as spring. The fix
+belonged in RW (house rule 4), and it is there: **`Net/SeasonSync` in RW 0.25.0** broadcasts the
+season to every client on `SeasonSystem`'s own 10s cadence, unconditionally, four bytes, and
+`wrath status` now names the season's SOURCE on both sides — mandatory, because Spring is index
+0 and so is "nothing has ever told us". Every `ZRoutedRpc` call shape was verified by decompile;
+one fact recorded: `HandleRoutedRPC` drops an unregistered hash **silently**, so an unarmed or
+older client leaves no trace in any log. **Undertow changed nothing and needs nothing**:
+`WrathBridge` reads `SeasonSystem.Current` as before and starts getting a true answer; against
+an older RW it reads spring, exactly as today, so there is no version floor. **NOT VERIFIED
+IN-GAME on either side.** RW `9a879e9` was pushed by this session. RW's local `main` has since
+moved to `250410a` ("0.26.0: storms anchor in the wild") from another session, unpushed and not
+this session's — the season sync rides in whatever RW version deploys next.
+
+**2. Store art.** `icon.png` is now the owner's shield render (wave, sea serpent, the name cut
+into weathered wood). The 1408x768 source is wider than it is tall, so no square crop holds the
+whole emblem; it is an 816x816 window centred on the shield with the 24px beyond the top and
+bottom edges filled by stretching the edge row, then resized to 256x256. Both bands vanish at
+icon scale; a plain 768 crop clipped both wing tips. Zip rebuilt. No version bump: nothing has
+shipped with the old icon. A banner reading was tried and reverted — the owner wanted the logo.
+
+**3. Three compatibility analyses, at three honest levels of confidence.** All in `CLAUDE.md`'s
+Compatibility constraints with a ⚠️, and each with a measurement protocol in the backlog.
+
+- **Dive In (sighsorry) — task 5c.** From its published GPL-3.0 source. Everything it does to a
+  swimmer is inside `Character.UpdateSwimming`, our postfix's method: a prefix scales
+  `m_swimSpeed` and steers `m_moveDir`; a postfix/finalizer restore both. **Never writes
+  `m_currentVel`, never replaces the lerp, never touches `m_swimAcceleration`** — so the 20x
+  cancellation holds and the two compose. The one ordering-dependent detail: which
+  `m_swimSpeed` our drowning-guard cap sees. Holds either way; the tight case is an
+  **encumbered diver in a storm** (0.3 m/s headway, not tenfold). Lives in the `Wonderland`
+  Gale profile, not Ravenrest.
+- **Sailing (Smoothbrain) — task 2c.** From public source, which stops at 1.1.7 while
+  Ravenrest ships 1.1.8 (empty changelog; gap unknown). **It is NOT the "adds force and caps
+  speed" mod the boat-mod warning describes** — it never touches `CustomFixedUpdate`. One
+  result-decorating postfix on `GetSailForce` (up to 2.5x), skill gates, a once-a-second
+  nudge impulse. Propulsion, not water. **Prediction: sail down, `ALONG-RATIO` reads
+  identically with it on or off**, since 2.5 × 0 is 0. It is ON RAVENREST.
+- **Njord (Wubarrk) — task 2d.** **No public source** (Discord invite for a website, a licence
+  reserving modification), so analysed from README, changelog and config only, and the entry
+  says so. This IS the mod the warning was written for: forces, per-hull caps (7/16.8/26/30),
+  overhauled curve. What holds anyway: our saturation term is zero above 1.92 m/s along the
+  current and Njord's lowest cap is 7, so **push and cap never meet**; our impulse integrates
+  after every FixedUpdate patch, so any in-tick clamp overshoots by one tick's `dv` (0.024
+  m/s). If it replaces vanilla's update, our postfix still runs; what changes is the damping —
+  **the first non-vanilla damping the saturation claim has met, which makes `ALONG-RATIO`
+  under Njord the single most informative number left to measure.** Well below 0.86–0.96 means
+  `DriftStrength` up on that server, a tuning not a toggle. It is ON RAVENREST.
+
+**4. Docs retired that a reader would trip on:** "`package.ps1` not ported yet" (it is, with
+three guards), "Planned." on the built layout, the `Floating` trap still marked UNVERIFIED,
+and two backlog open questions — including **every-client is settled: server and every client,
+deliberately NOT version-gated** (a skewed pair behaves like the config-mismatch case the README
+already warns about; revisit when a release changes the field's maths, copying RW's warn-once
+`VersionSync`).
 
 ---
 
 ## What remains, in order
 
-1. **Resolve the blocker above, then make the repo public.** `manifest.json`'s `website_url`
-   points at it, so a store listing 404s while it is private.
-2. **Publish.** Thunderstore and Hexium, team `RavenIronStudios` (NOT the GitHub org name —
-   that distinction has bitten this studio before). Build with `tools\package.ps1`, never by
-   hand: it refuses to package when the three version strings disagree, when a store file is
-   missing, or when the icon is not exactly 256x256. Both new guards were tested by breaking
-   them on purpose.
-3. **Compatibility testing against other boat mods.** Every drift measurement so far is a clean
-   baseline taken with none installed. Some boat mods patch `Ship.CustomFixedUpdate` too; our
-   postfix runs last, so a push lands on top of whatever they did. Run task 2's acceptance
-   twice, with and without, and compare displacement. If they fight, the answer is a
-   default-off compatibility toggle, never a priority war (house rule 1).
-4. **The client-blind season — BUILT 2026-08-30, awaiting one in-game run.**
-   `SeasonSystem.Current` was only assigned in RW's `Tick()`, which RW gates on the simulation
-   authority, so every client computed the field as spring. Boats never desynced (all clients
-   agreed with each other) but the seasonal shift was inert away from a listen host. The fix
-   belonged in Ragnarok's Wrath — syncing its season — not in a second season clock here, which
-   is exactly the conflict house rule 4 exists to prevent. **RW 0.25.0 does it**: `Net/SeasonSync`
-   broadcasts the season to everyone on SeasonSystem's own 10s cadence, absolute and
-   unconditional, and `wrath status` now names the season's SOURCE so a client can tell a
-   working sync from the spring-shaped hole it leaves when it fails. Undertow is unchanged and
-   needs no version floor. **To verify:** deploy RW 0.25.0 to the server AND the client, get the
-   world past day `SeasonLengthDays` so the season is not legitimately spring, then on the client
-   type `wrath status` (RW's console) for `synced from the server`, and `wake here` to confirm
-   the field's seasonal term moved with it.
-5. **Tuning, once real players have sailed it.** `MaxCurrentSpeed` (1.2 m/s) is the headline
-   dial and has never been judged by anyone but its author. `FlotsamPerHour` ships at 6/hour,
-   which is deliberately sparse.
+1. **Resolve the blocker above, then make the repo public.**
+2. **One Ravenrest session, and it answers three things at once.** Njord and Sailing are
+   already there, so the "with" runs are the default state. A karve, sail down, in known water
+   (`wake here`), `VerboseLogging = true`, watch the 2s `drift` line settle: the `ALONG-RATIO`
+   is tasks 2c and 2d's answer together (vanilla gave 0.86 karve / 0.96 longship). In the same
+   session, once RW ≥ 0.25.0 is on server AND client, type `wrath status` on the client and
+   read `synced from the server` — that is the season fix verified, and then `wake here` to
+   see the field's seasonal term move with it. **Deploying RW to Ravenrest means a restart;
+   ask before touching that server** (see memory: the join code dies with it).
+3. **Publish 0.5.1.** Thunderstore and Hexium, team `RavenIronStudios` (NOT the GitHub org
+   name). `tools\package.ps1` only, never by hand.
+4. **Dive In, task 5c, on `Wonderland`.** Six steps; step 2 reads which postfix ordering the
+   profile actually produced from the `swimSpeed` the log line prints.
+5. **The "without" runs** for 2c and 2d, each a both-sides park (both mods are ServerSync-pinned).
+6. **Tuning, once real players have sailed it.** `MaxCurrentSpeed` 1.2 and `FlotsamPerHour` 6
+   have one judge so far.
+7. **Low, not blocking:** the swimmer postfix evaluates the field every physics tick with no
+   cache — 450 `GetHeight` calls a second for the local swimmer, the exact cost the ship patch
+   caches away on a timer. One swimmer per client, so modest; five lines if a profile flags it.
+   Nothing has ever been profiled.
 
 ---
 
-## What this session actually taught, and it is the useful part
+## What this session taught
+
+- **"Read the published source, never the DLL" scales to three confidence levels, and the
+  docs must say which one each entry is at.** Dive In and Sailing got source; Njord got docs.
+  All three verdicts are "composes", but a reader has to know that 2d is reasoned from Unity
+  physics and our own code rather than from theirs. Say the version gap out loud too: Sailing's
+  source is behind its release, and that is a fact about the analysis, not a footnote.
+- **When the value you are syncing has a failure mode that looks exactly like its default,
+  print the SOURCE next to it.** Spring is index 0; an unarmed client, an old client and a
+  working sync on a spring day all read the same. The season line without its source was an
+  instrument that could not distinguish success from silence.
+- **A decompile is worth one sentence when it overturns an assumption.** "Unregistered RPC
+  hashes log a warning" was wrong — they drop silently — and that changes what a missing log
+  line means. Recorded where the registration lives.
+- **Three tooling scars, all cheap, all avoidable next time.** The scratchpad path moves with
+  the session's working directory — a write into the old one failed. Both `awk` print
+  statements and `sed` replacements interpret backslash escapes, so `.\tools\package.ps1`
+  arrived as a tab and a `p`; when a line carries backslashes, put it in a file and `getline`
+  it in. And a ~14KB quoted heredoc through the Bash tool failed to parse at all — for a whole
+  document, use the Write tool into the scratchpad and move it. `python` is still the Store
+  stub.
+- **A question left open for the owner, not assumed:** Njord's README is written in this
+  codebase's voice, and the owner's `Wonderland` profile is the Wubarrk Wonderland pack. **If
+  Njord is the owner's, its source is available** and task 2d's two open questions — replace or
+  decorate `CustomFixedUpdate`, where the cap acts — close in ten minutes at 2c's standard.
+  Asked; not answered; not assumed.
+
+---
+
+## What the 2026-08-28 session taught (kept — it is the useful part)
 
 **Four designs were killed by measurement. None by review.**
 
@@ -161,17 +230,20 @@ was not the cause, do not cite*.
 
 ## Working notes for the next session
 
-- **The server used for testing is the owner's Ravenrest dedicated server**, with the full
-  fifteen-mod set. Testing Undertow means trimming it to match whatever the client's Gale
-  profile carries, then restoring. Three of its mods (VikingOS, AzuExtendedPlayerInventory,
-  WardIsLove) **hard-kick a client on version mismatch** — that is what "incompatible version"
-  means there, not a Valheim mismatch.
-- **The client runs through Gale**, profile `Default`, which currently carries Undertow with
-  test config (`VerboseLogging = true`, flotsam at 120/hour). Valheim locks the DLL while
-  running: the owner must quit to desktop before any redeploy.
-- **The scratch world `UndertowSmoke`** and `LogOutput.log.pre-undertow` are both still in
-  place, left deliberately — world data is not deleted without being asked.
-- **Bump the version on every deploy.** It sat at 0.1.0 through several rebuilds early on, and
-  "which build is actually loaded" became unanswerable from a log. The owner caught it.
-- **`python` on this machine is the Microsoft Store stub, not an interpreter.** Use sed/awk or
-  PowerShell.
+- **The server used for testing is the owner's Ravenrest dedicated server**, 26 plugins today
+  including Njord 1.3.5 and Sailing 1.1.8. Three of its mods (VikingOS,
+  AzuExtendedPlayerInventory, WardIsLove) **hard-kick a client on version mismatch** — that is
+  what "incompatible version" means there, not a Valheim mismatch. RW's own `VersionSync` only
+  warns, so deploying RW server-first is safe.
+- **Do not restart Ravenrest without asking.** The join code dies with the process.
+- **The client runs through Gale.** `Default` carries Undertow with test config
+  (`VerboseLogging = true`, flotsam at 120/hour). `Wonderland` is the larger build and the
+  only profile with Dive In. Valheim locks the DLL while running: quit to desktop before any
+  redeploy.
+- **The scratch world `UndertowSmoke`** and `LogOutput.log.pre-undertow` are still in place,
+  left deliberately — world data is not deleted without being asked.
+- **Bump the version on every deploy**, or "which build is actually loaded" is unanswerable.
+- **RagnaroksWrath has `.claude/` and `scratchpad-ravenrest/` untracked and not ignored.**
+  Stage explicitly there; do not sweep.
+- **`python` on this machine is the Microsoft Store stub.** Use sed/awk or PowerShell — and
+  for lines with backslashes, a file and `getline`.
